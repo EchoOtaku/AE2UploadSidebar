@@ -1,0 +1,37 @@
+modLoader="javafml"
+loaderVersion="[4,)"
+license="MIT"
+
+[[mods]]
+modId="sidebar_smoke"
+version="1.0.0"
+displayName="AE2 Embedded Sidebar Integration Fixture"
+description='''Test-only mod that creates a unique world in the isolated run-test directory, verifies server uploads and captures the real terminal screen. Never included in the release JAR.'''
+
+[[dependencies.sidebar_smoke]]
+modId="minecraft"
+type="required"
+versionRange="[1.21.1]"
+ordering="NONE"
+side="CLIENT"
+
+[[dependencies.sidebar_smoke]]
+modId="neoforge"
+type="required"
+versionRange="[21.1.241,21.2)"
+ordering="NONE"
+side="CLIENT"
+
+[[dependencies.sidebar_smoke]]
+modId="ae2"
+type="required"
+versionRange="[19.2.17,19.3)"
+ordering="AFTER"
+side="CLIENT"
+
+[[dependencies.sidebar_smoke]]
+modId="ae2_upload_sidebar"
+type="required"
+versionRange="[0,)"
+ordering="AFTER"
+side="CLIENT"

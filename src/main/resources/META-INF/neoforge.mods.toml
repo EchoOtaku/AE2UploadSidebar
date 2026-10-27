@@ -1,0 +1,34 @@
+modLoader="javafml"
+loaderVersion="[4,)"
+license="MIT"
+
+[[mods]]
+modId="ae2_upload_sidebar"
+version="${modVersion}"
+displayName="AE2 Upload Sidebar"
+authors="Echo"
+description='''AE2 pattern-upload sidebar with private labels, icons, favorites and pinyin search. Beta build.'''
+
+[[mixins]]
+config="ae2_upload_sidebar.mixins.json"
+
+[[dependencies.ae2_upload_sidebar]]
+modId="neoforge"
+type="required"
+versionRange="[21.1.241,)"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.ae2_upload_sidebar]]
+modId="minecraft"
+type="required"
+versionRange="[1.21.1,1.21.2)"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.ae2_upload_sidebar]]
+modId="ae2"
+type="required"
+versionRange="[19.2.17,19.3)"
+ordering="AFTER"
+side="BOTH"

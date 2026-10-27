@@ -88,7 +88,36 @@ final class SidebarTheme {
 
     void providerRow(GuiGraphics graphics, int x, int y, int width, int height, boolean enabled, boolean hovered) {
         if (vanilla) plainHoverButton(graphics, x, y, width, height, enabled, hovered);
-        else button(graphics, x, y, width, height, enabled, hovered);
+        else {
+            String name = !enabled ? "button_disabled" : hovered ? "button_highlighted" : "button";
+            var sprite = ResourceLocation.fromNamespaceAndPath("ae2", name);
+            var sprites = Minecraft.getInstance().getGuiSprites();
+            if (sprites.getSpriteScaling(sprites.getSprite(sprite)) instanceof GuiSpriteScaling.NineSlice slice) {
+                // GUI nine-slice normally tiles the center. AE2's 20px button gradient
+                // repeats inside our 26px rows, producing a seam through the second line.
+                // Stretch each patch instead, preserving the pack's border dimensions.
+                var texture = ResourceLocation.fromNamespaceAndPath("ae2", "textures/gui/sprites/" + name + ".png");
+                int left = Math.min(slice.border().left(), width / 2);
+                int right = Math.min(slice.border().right(), width / 2);
+                int top = Math.min(slice.border().top(), height / 2);
+                int bottom = Math.min(slice.border().bottom(), height / 2);
+                int[] outW = {left, width - left - right, right};
+                int[] outH = {top, height - top - bottom, bottom};
+                int[] srcW = {slice.border().left(), slice.width() - slice.border().left() - slice.border().right(), slice.border().right()};
+                int[] srcH = {slice.border().top(), slice.height() - slice.border().top() - slice.border().bottom(), slice.border().bottom()};
+                int dy = y, sy = 0;
+                for (int row = 0; row < 3; row++) {
+                    int dx = x, sx = 0;
+                    for (int col = 0; col < 3; col++) {
+                        if (outW[col] > 0 && outH[row] > 0 && srcW[col] > 0 && srcH[row] > 0)
+                            graphics.blit(texture, dx, dy, outW[col], outH[row], (float) sx, (float) sy,
+                                srcW[col], srcH[row], slice.width(), slice.height());
+                        dx += outW[col]; sx += srcW[col];
+                    }
+                    dy += outH[row]; sy += srcH[row];
+                }
+            } else graphics.blitSprite(sprite, x, y, width, height);
+        }
     }
 
     private void plainHoverButton(GuiGraphics graphics, int x, int y, int width, int height, boolean enabled, boolean hovered) {

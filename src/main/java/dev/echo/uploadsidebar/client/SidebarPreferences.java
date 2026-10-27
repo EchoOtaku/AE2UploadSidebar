@@ -19,6 +19,7 @@ public final class SidebarPreferences {
     private int rows = 5;
     private boolean collapsed;
     private boolean locked;
+    private boolean groupProviders;
     private boolean forceExpanded;
     private PanelGeometry.HeightMode heightMode = PanelGeometry.HeightMode.STANDARD;
     private Theme theme = Theme.AE2;
@@ -34,6 +35,7 @@ public final class SidebarPreferences {
         result.rows = Math.max(1, Math.min(12, integer(properties, "rows", 5)));
         result.collapsed = Boolean.parseBoolean(properties.getProperty("collapsed", "false"));
         result.locked = Boolean.parseBoolean(properties.getProperty("locked", "false"));
+        result.groupProviders = Boolean.parseBoolean(properties.getProperty("groupProviders", "false"));
         result.forceExpanded = Boolean.parseBoolean(properties.getProperty("forceExpanded", "false"));
         try { result.heightMode = PanelGeometry.HeightMode.valueOf(properties.getProperty("heightMode", "STANDARD")); }
         catch (IllegalArgumentException ignored) { }
@@ -53,6 +55,7 @@ public final class SidebarPreferences {
         values.setProperty("rows", Integer.toString(rows));
         values.setProperty("collapsed", Boolean.toString(collapsed));
         values.setProperty("locked", Boolean.toString(locked));
+        values.setProperty("groupProviders", Boolean.toString(groupProviders));
         values.setProperty("forceExpanded", Boolean.toString(forceExpanded));
         values.setProperty("heightMode", heightMode.name());
         values.setProperty("theme", theme.name());
@@ -77,6 +80,8 @@ public final class SidebarPreferences {
     public int rows() { return rows; }
     public boolean collapsed() { return collapsed; }
     public boolean locked() { return locked; }
+    public boolean groupProviders() { return groupProviders; }
+    public void setGroupProviders(boolean value) { groupProviders = value; }
     public boolean forceExpanded() { return forceExpanded; }
     public PanelGeometry.HeightMode heightMode() { return heightMode; }
     public Theme theme() { return theme; }

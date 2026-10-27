@@ -11,21 +11,21 @@ description='''Test-only mod that creates a unique world in the isolated run-tes
 [[dependencies.sidebar_smoke]]
 modId="minecraft"
 type="required"
-versionRange="[1.21.1]"
+versionRange="${minecraftRange}"
 ordering="NONE"
 side="CLIENT"
 
 [[dependencies.sidebar_smoke]]
 modId="neoforge"
 type="required"
-versionRange="[21.1.241,21.2)"
+versionRange="${neoForgeRange}"
 ordering="NONE"
 side="CLIENT"
 
 [[dependencies.sidebar_smoke]]
 modId="ae2"
 type="required"
-versionRange="[19.2.17,19.3)"
+versionRange="${ae2Range}"
 ordering="AFTER"
 side="CLIENT"
 

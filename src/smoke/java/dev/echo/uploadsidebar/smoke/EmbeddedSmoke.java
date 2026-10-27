@@ -59,6 +59,7 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
 /** Isolated integration fixture; the smoke source set is never part of the release JAR. */
 @Mod(value = "sidebar_smoke", dist = Dist.CLIENT)
 public final class EmbeddedSmoke {
+    private static final boolean MINIMAL = Boolean.getBoolean("sidebar.smoke.minimal");
     private static final Path EXPECTED_RUN_DIRECTORY = SmokePaths.runDirectory();
     private static final String SCREENSHOT_NAME = "embedded-sidebar.png";
     private static final String WIRELESS_SCREENSHOT = "wireless-wet-sidebar.png";
@@ -78,7 +79,8 @@ public final class EmbeddedSmoke {
     private boolean screenshotRequested;
     private int screenTicks;
     private int shutdownTicks;
-    private boolean clientInteractionPassed;
+    private volatile boolean clientInteractionPassed;
+    private volatile boolean minimalServerInventoryVerified;
     private boolean layoutInteractionPassed;
     private boolean mappingAssertionsPassed;
     private boolean runtimeToggleAssertionsPassed;
@@ -88,8 +90,8 @@ public final class EmbeddedSmoke {
     private boolean worldLocatorPassed;
     private final ProviderEditorAssertions providerEditor = new ProviderEditorAssertions();
     private boolean providerEditorPassed;
-    private final RecipeCategoryAssertions normalCategory = new RecipeCategoryAssertions("normal");
-    private final RecipeCategoryAssertions wirelessCategory = new RecipeCategoryAssertions("wireless");
+    private final RecipeCategoryAssertions normalCategory = MINIMAL ? null : new RecipeCategoryAssertions("normal");
+    private final RecipeCategoryAssertions wirelessCategory = MINIMAL ? null : new RecipeCategoryAssertions("wireless");
     private boolean normalCategoryPassed;
     private boolean wirelessCategoryPassed;
     private volatile boolean wirelessRequested;
@@ -104,6 +106,28 @@ public final class EmbeddedSmoke {
     private int wirelessProvidersBefore;
 
     public EmbeddedSmoke() {
+        String artifact = System.getProperty("sidebar.smoke.artifact");
+        if (artifact != null) {
+            try {
+                Path loaded = net.neoforged.fml.ModList.get().getModFileById("ae2_upload_sidebar")
+                    .getFile().getFilePath();
+                if (!Files.isSameFile(Path.of(artifact), loaded))
+                    throw new AssertionError("Expected packaged JAR, actually loaded " + loaded);
+                String hash = java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(Files.readAllBytes(loaded)));
+                LogUtils.getLogger().info("EMBEDDED_SMOKE: packaged artifact PASS: {} SHA256={}", loaded, hash);
+            } catch (Exception e) {
+                throw new IllegalStateException("Cannot verify packaged artifact", e);
+            }
+        }
+        if (MINIMAL) {
+            var actual = net.neoforged.fml.ModList.get().getMods().stream()
+                .map(info -> info.getModId()).collect(java.util.stream.Collectors.toSet());
+            var expected = new java.util.HashSet<>(java.util.Set.of("minecraft", "neoforge", "ae2", "ae2_upload_sidebar", "sidebar_smoke"));
+            if (Boolean.parseBoolean(System.getProperty("sidebar.smoke.guideMe", "true"))) expected.add("guideme");
+            if (!actual.equals(expected)) throw new AssertionError("Minimal mod allowlist mismatch: " + actual);
+            LogUtils.getLogger().info("EMBEDDED_SMOKE: minimal mod allowlist PASS: {}", actual);
+        }
         NeoForge.EVENT_BUS.addListener(this::clientTick);
         NeoForge.EVENT_BUS.addListener(this::serverTick);
         LogUtils.getLogger().info("EMBEDDED_SMOKE: fixture registered; isolated world {}", worldId);
@@ -153,7 +177,7 @@ public final class EmbeddedSmoke {
             }
             if (privateNotesAssertionsPassed && !privateIconsAssertionsPassed && client.getOverlay() == null) {
                 stage = "checking private provider icon selection from actual carried inventory";
-                privateIconsAssertionsPassed = PrivateIconsAssertions.tick(client);
+                privateIconsAssertionsPassed = MINIMAL || PrivateIconsAssertions.tick(client);
                 if (!privateIconsAssertionsPassed) return;
             }
             if (assertionsPassed && !screenshotRequested
@@ -198,6 +222,23 @@ public final class EmbeddedSmoke {
                 screenTicks = 0;
             }
             if (screenshotRequested) screenshotSaved = SmokeScreenshots.saved(SCREENSHOT_NAME);
+            if (MINIMAL && screenshotSaved) {
+                if (!minimalServerInventoryVerified) return;
+                if (++shutdownTicks >= 20) {
+                    stage = "complete minimal environment";
+                    writeReport(client, "SMOKE_PASS\nminimal_mode=true\nworld=" + worldId
+                        + "\nloaded_mods=" + net.neoforged.fml.ModList.get().getMods().stream()
+                            .map(info -> info.getModId()).sorted().collect(java.util.stream.Collectors.joining(",")) + "\n"
+                        + "exact_mod_allowlist=PASS\npacket_codec=PASS\nserver_transaction_invariants=PASS\n"
+                        + "embedded_real_network_upload_3_to_2=PASS\n"
+                        + "minimal_server_source_two_provider_total_one=PASS\n"
+                        + RuntimeToggleAssertions.report() + MappingAssertions.report() + PrivateNotesAssertions.report()
+                        + LayoutInteractionAssertions.report() + SmokeScreenshots.report()
+                        + "optional_jei_wireless_extended_tests=NOT_APPLICABLE\n");
+                    client.stop();
+                }
+                return;
+            }
             if (screenshotSaved && !normalCategoryPassed) {
                 stage = "checking real JEI category transfer and unmapped recipe search on normal terminal";
                 normalCategoryPassed = normalCategory.tick(client);
@@ -281,8 +322,21 @@ public final class EmbeddedSmoke {
                 return;
             }
             if (assertionsStarted) {
+                if (MINIMAL && clientInteractionPassed) {
+                    if (!minimalServerInventoryVerified) {
+                        int patterns = 0;
+                        for (var position : List.of(TERMINAL_POS.east(), TERMINAL_POS.north())) {
+                            var provider = (PatternProviderBlockEntity) level.getBlockEntity(position);
+                            for (var stack : provider.getLogic().getPatternInv()) patterns += stack.getCount();
+                        }
+                        if (terminal.getLogic().getEncodedPatternInv().getStackInSlot(0).getCount() != 2 || patterns != 1)
+                            throw new AssertionError("Minimal real upload must leave two source patterns and one provider pattern");
+                        minimalServerInventoryVerified = true;
+                    }
+                    return;
+                }
                 PrivateNotesAssertions.serverTick(player, terminal);
-                PrivateIconsAssertions.serverTick(player, terminal);
+                if (!MINIMAL) PrivateIconsAssertions.serverTick(player, terminal);
                 return;
             }
             if (terminal == null) {

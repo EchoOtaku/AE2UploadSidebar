@@ -58,14 +58,15 @@ final class MappingAssertions {
                 new RecipeHolder<>(holder.id(), (CraftingRecipe) holder.value()),
                 inputs, new ItemStack(Items.CRAFTING_TABLE), false, false);
             require(PatternDetailsHelper.decodePattern(crafting, client.level) != null, "real encoded crafting sample decodes");
-            String title = SidebarJeiPlugin.categoryTitle(ResourceLocation.withDefaultNamespace("crafting"));
-            require(!title.isBlank(), "actual JEI crafting category has a display title");
+            String title = Boolean.getBoolean("sidebar.smoke.minimal") ? "crafting"
+                : SidebarJeiPlugin.categoryTitle(ResourceLocation.withDefaultNamespace("crafting"));
+            require(!title.isBlank(), "crafting category has a JEI title or a native recipe-type fallback");
             for (var mapping : SidebarMappings.availableMappings()) {
                 if (List.of("minecraft:crafting", "crafting", title).contains(mapping.key()))
                     SidebarMappings.removeAlias(mapping.key());
             }
             SidebarMappings.tick(menu, crafting);
-            require(SidebarMappings.hint().equals("配方类别：" + title), "unmapped crafting uses the actual localized JEI category title");
+            require(SidebarMappings.hint().equals("配方类别：" + title), "unmapped crafting uses the available category fallback");
             require(SidebarMappings.matches(entry(title + "子网", 2)), "unmapped crafting still searches providers by category name");
             require(SidebarMappings.saveAlias("minecraft:crafting", FIXTURE_MACHINE), "save isolated shared mapping fixture");
             SidebarMappings.tick(menu, crafting);
@@ -179,7 +180,8 @@ final class MappingAssertions {
 
     static String report() {
         return "crafting_shared_mapping_real_recipe=" + (passed ? "PASS" : "NOT_RUN") + "\n"
-            + "crafting_unmapped_localized_jei_category_fallback=" + (passed ? "PASS" : "NOT_RUN") + "\n"
+            + (Boolean.getBoolean("sidebar.smoke.minimal") ? "crafting_unmapped_native_type_fallback=" : "crafting_unmapped_localized_jei_category_fallback=")
+            + (passed ? "PASS" : "NOT_RUN") + "\n"
             + "processing_unknown_and_manual_invalidation=" + (passed ? "PASS" : "NOT_RUN") + "\n"
             + "selector_native_manager_menu_preserved=" + (passed ? "PASS" : "NOT_RUN") + "\n"
             + "mapping_concrete_tokens_and_source_unchanged=" + (passed ? "PASS" : "NOT_RUN") + "\n";

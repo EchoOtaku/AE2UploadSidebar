@@ -58,7 +58,16 @@ public class InstalledApiContractTest {
             "The upload path must continue reading the encoded-pattern slot, not a crafting preview");
     }
 
+    @Test void encodingMixinTargetRemainsAnInstanceVoidMethod() throws Exception {
+        int access = method(inspect(AE2, ENCODING_MENU), "encode", "()V");
+        assertEquals(0, access & Opcodes.ACC_STATIC);
+    }
+
     @Test void nativeGridCanEnumerateActivePatternContainers() throws Exception {
+        int nodeAccess = method(inspect(AE2, "appeng/menu/me/common/MEStorageMenu"),
+            "getGridNode", "()Lappeng/api/networking/IGridNode;");
+        assertNotEquals(0, nodeAccess & Opcodes.ACC_PUBLIC);
+        assertEquals(0, nodeAccess & Opcodes.ACC_STATIC);
         method(inspect(AE2, "appeng/api/networking/IGrid"), "getMachineClasses", "()Ljava/lang/Iterable;");
         method(inspect(AE2, "appeng/api/networking/IGrid"), "getActiveMachines", "(Ljava/lang/Class;)Ljava/util/Set;");
         method(inspect(AE2, "appeng/helpers/patternprovider/PatternContainer"), "isVisibleInTerminal", "()Z");
@@ -80,6 +89,15 @@ public class InstalledApiContractTest {
         return access;
     }
 
+    @Test void installedMatrixPatternCoreExposesNativePatternContainerContract() throws Exception {
+        var matrix = inspect("ExtendedAE-1.21-2.2.32-neoforge.jar",
+            "com/glodblock/github/extendedae/common/tileentities/matrix/TileAssemblerMatrixPattern");
+        assertTrue(matrix.interfaces.contains("appeng/helpers/patternprovider/PatternContainer"));
+        method(matrix, "getGrid", "()Lappeng/api/networking/IGrid;");
+        method(matrix, "getTerminalPatternInventory", "()Lappeng/api/inventories/InternalInventory;");
+        method(matrix, "getTerminalGroup", "()Lappeng/api/implementations/blockentities/PatternContainerGroup;");
+    }
+
     private static void publicStatic(ApiClass type, String name, String descriptor) {
         int flags = Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC;
         assertEquals(flags, method(type, name, descriptor) & flags, name + " must stay callable as public static");
@@ -97,6 +115,7 @@ public class InstalledApiContractTest {
                     @Override public void visit(int version, int access, String name, String signature,
                                                 String superName, String[] interfaces) {
                         result.parent = superName;
+                        result.interfaces = java.util.List.of(interfaces);
                     }
                     @Override public MethodVisitor visitMethod(int access, String name, String descriptor,
                                                                String signature, String[] exceptions) {
@@ -116,6 +135,7 @@ public class InstalledApiContractTest {
 
     private static final class ApiClass {
         private String parent;
+        private java.util.List<String> interfaces;
         private final Map<String, Integer> methods = new HashMap<>();
         private final Map<String, String> fields = new HashMap<>();
     }

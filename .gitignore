@@ -1,6 +1,8 @@
 .gradle/
 build/
 run-test/
+build-compat-*/
+compatibility/
 *.log
 test-dependencies/
 outputs/

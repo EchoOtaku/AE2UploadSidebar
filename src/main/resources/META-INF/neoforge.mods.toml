@@ -15,20 +15,20 @@ config="ae2_upload_sidebar.mixins.json"
 [[dependencies.ae2_upload_sidebar]]
 modId="neoforge"
 type="required"
-versionRange="[21.1.241,)"
+versionRange="${neoForgeRange}"
 ordering="NONE"
 side="BOTH"
 
 [[dependencies.ae2_upload_sidebar]]
 modId="minecraft"
 type="required"
-versionRange="[1.21.1,1.21.2)"
+versionRange="${minecraftRange}"
 ordering="NONE"
 side="BOTH"
 
 [[dependencies.ae2_upload_sidebar]]
 modId="ae2"
 type="required"
-versionRange="[19.2.17,19.3)"
+versionRange="${ae2Range}"
 ordering="AFTER"
 side="BOTH"

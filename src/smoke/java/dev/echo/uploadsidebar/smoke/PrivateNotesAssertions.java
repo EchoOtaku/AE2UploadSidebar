@@ -66,6 +66,7 @@ final class PrivateNotesAssertions {
     private static Map<String, UUID> refreshTokens;
     private static Channel observedChannel;
     private static Properties baselineNotes;
+    private static int groupPhase;
 
     /** Called after the existing destructive server-ticket tests, using the replacement provider. */
     static void prepareServerFixture(ServerPlayer player, PatternEncodingTerminalPart terminal) {
@@ -293,6 +294,7 @@ final class PrivateNotesAssertions {
             }
             case 12 -> {
                 if (!ready(client)) return false;
+                if (!verifyGroups(client)) return false;
                 require(entries().stream().allMatch(entry -> uncheckedNote(entry).isEmpty()), "Delete removes only the edited provider note");
                 Properties after = persistedNotes(client);
                 Properties before = new Properties();
@@ -360,6 +362,63 @@ final class PrivateNotesAssertions {
     private static void normalizePanel() throws Exception {
         if (LayoutInteractionAssertions.layout().collapsed()) LayoutInteractionAssertions.clickControl(terminalScreen, "collapse");
         if (LayoutInteractionAssertions.controlBounds("theme") != null) LayoutInteractionAssertions.clickControl(terminalScreen, "settings");
+        var preferences = (dev.echo.uploadsidebar.client.SidebarPreferences) field(state("panel"), "preferences");
+        if (preferences.groupProviders()) {
+            LayoutInteractionAssertions.clickControl(terminalScreen, "settings");
+            LayoutInteractionAssertions.clickControl(terminalScreen, "grouping");
+            LayoutInteractionAssertions.clickControl(terminalScreen, "settings");
+        }
+    }
+
+    private static boolean verifyGroups(Minecraft client) throws Exception {
+        var panel = (dev.echo.uploadsidebar.client.SidebarPanel) state("panel");
+        var rowsMethod = panel.getClass().getDeclaredMethod("visibleRows");
+        rowsMethod.setAccessible(true);
+        var preferences = (dev.echo.uploadsidebar.client.SidebarPreferences) field(panel, "preferences");
+        if (groupPhase == 0) {
+            LayoutInteractionAssertions.clickControl(terminalScreen, "settings");
+            if (!preferences.groupProviders()) LayoutInteractionAssertions.clickControl(terminalScreen, "grouping");
+            LayoutInteractionAssertions.clickControl(terminalScreen, "settings");
+            require(((List<?>) rowsMethod.invoke(panel)).size() == 1, "same-name providers collapse into one actual UI row");
+            require(panel.iconTargets().isEmpty(), "group header is never a JEI icon drop target");
+            groupPhase++; captureTicks = 0;
+            return false;
+        }
+        if (groupPhase == 1) {
+            if (!capture(client, "sidebar-group-collapsed.png")) return false;
+            LayoutInteractionAssertions.clickControl(terminalScreen, "row0");
+            require(((List<?>) rowsMethod.invoke(panel)).size() == 3, "group expands into a header and two concrete rows");
+            require(panel.iconTargets().size() == 2, "only expanded children accept icon drops");
+            require(uploads.get() == 0, "expanding a group never uploads a pattern");
+            groupPhase++; captureTicks = 0;
+            return false;
+        }
+        if (groupPhase == 2) {
+            if (!capture(client, "sidebar-group-expanded.png")) return false;
+            var expected = panel.iconTargets().get(1).entry();
+            var bounds = LayoutInteractionAssertions.controlBounds("row2");
+            var press = new ScreenEvent.MouseButtonPressed.Pre(terminalScreen,
+                bounds.x() + bounds.width() / 2d, bounds.y() + bounds.height() / 2d, 1);
+            NeoForge.EVENT_BUS.post(press);
+            require(press.isCanceled() && isEditor(client.screen), "expanded child opens its own note editor");
+            require(((SidebarPackets.Entry) field(client.screen, "entry")).token().equals(expected.token()),
+                "expanded second child keeps its exact provider identity");
+            clickEditor(client, "cancel");
+            assertTerminal(client, originalPattern);
+            groupPhase++;
+            return false; // Auxiliary screens invalidate targets; wait for a real server refresh.
+        }
+        if (groupPhase == 3) {
+            LayoutInteractionAssertions.clickControl(terminalScreen, "row0");
+            require(((List<?>) rowsMethod.invoke(panel)).size() == 1, "group can collapse again");
+            LayoutInteractionAssertions.clickControl(terminalScreen, "settings");
+            LayoutInteractionAssertions.clickControl(terminalScreen, "grouping");
+            LayoutInteractionAssertions.clickControl(terminalScreen, "settings");
+            require(((List<?>) rowsMethod.invoke(panel)).size() == 2, "disabling grouping restores two concrete rows");
+            require(uploads.get() == 0, "group interactions preserve zero uploads");
+            groupPhase++;
+        }
+        return true;
     }
 
     private static boolean ready(Minecraft client) throws Exception {
@@ -547,6 +606,8 @@ final class PrivateNotesAssertions {
     }
     static String report() {
         return "pinyin_full_and_initials_real_search=PASS\n"
+            + "group_setting_expand_collapse_exact_child_editor_zero_uploads=PASS\n"
+            + "group_header_rejects_icon_drop_expanded_children_keep_identity=PASS\n"
             + "favorite_real_star_click_pins_exact_target_zero_uploads=PASS\n"
             + "favorite_refresh_identity_and_same_name_isolation=PASS\n"
             + "private_note_real_same_name_provider_editor_save_cancel_delete=PASS\n"

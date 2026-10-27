@@ -3,6 +3,7 @@ package dev.echo.uploadsidebar.client;
 import appeng.client.gui.AEBaseScreen;
 import com.mojang.logging.LogUtils;
 import dev.echo.uploadsidebar.core.PanelGeometry;
+import dev.echo.uploadsidebar.core.ProviderGroups;
 import dev.echo.uploadsidebar.core.SidebarSession;
 import dev.echo.uploadsidebar.net.SidebarPackets;
 import java.io.IOException;
@@ -34,6 +35,8 @@ public final class SidebarPanel {
     private String persistenceError = "";
     private String noteError = "";
     private String iconFeedback = "";
+    private record GroupKey(String name, String note, boolean favorite) { }
+    private final java.util.Set<GroupKey> expandedGroups = new java.util.HashSet<>();
 
     /** A drag captures a specific visible provider and its on-screen destination. */
     public record IconTarget(SidebarPackets.Entry entry, SidebarSession.Layout bounds) { }
@@ -76,6 +79,11 @@ public final class SidebarPanel {
             .filter(entry -> dev.echo.uploadsidebar.core.ProviderSearch.matches(SidebarNotes.searchText(entry), query)).toList();
     }
 
+    private List<ProviderGroups.Row<SidebarPackets.Entry, GroupKey>> visibleRows() {
+        return ProviderGroups.rows(visibleEntries(), preferences.groupProviders() && !SidebarClient.isProviderView(),
+            entry -> new GroupKey(entry.name(), SidebarNotes.note(entry), SidebarNotes.favorite(entry)), expandedGroups);
+    }
+
     /** Includes read-only icons so a rejected drop cannot reach an AE2 slot underneath. */
     public List<IconTarget> iconTargets() {
         var client = Minecraft.getInstance();
@@ -83,12 +91,14 @@ public final class SidebarPanel {
         if (!SidebarClient.isEnabled() || client.screen != screen || client.player == null
                 || client.player.containerMenu != screen.getMenu() || box.collapsed() || settingsOpen)
             return List.of();
-        var filtered = visibleEntries();
+        var filtered = visibleRows();
         int shown = PanelGeometry.rowCount(box);
         firstRow = Math.max(0, Math.min(firstRow, Math.max(0, filtered.size() - shown)));
         var targets = new ArrayList<IconTarget>();
-        for (int row = 0; row < shown && firstRow + row < filtered.size(); row++)
-            targets.add(new IconTarget(filtered.get(firstRow + row), controlBounds("icon" + row)));
+        for (int row = 0; row < shown && firstRow + row < filtered.size(); row++) {
+            var item = filtered.get(firstRow + row);
+            if (!item.header()) targets.add(new IconTarget(item.members().getFirst(), controlBounds("icon" + row)));
+        }
         return List.copyOf(targets);
     }
 
@@ -126,6 +136,7 @@ public final class SidebarPanel {
                 case "rows_plus" -> rect(box.x() + box.width() - 27, box.y() + 28 + step * 3, 18, height);
                 case "reset" -> rect(box.x() + 7, box.y() + 28 + step * 4, box.width() - 14, height);
                 case "mappings" -> rect(box.x() + 7, box.y() + 28 + step * 5, box.width() - 14, height);
+                case "grouping" -> rect(box.x() + 7, box.y() + 28 + step * 6, box.width() - 14, height);
                 default -> null;
             };
         }
@@ -153,7 +164,7 @@ public final class SidebarPanel {
         return new SidebarSession.Layout(x, y, width, height, false);
     }
     private static int settingsStep(SidebarSession.Layout box) {
-        return Math.max(16, Math.min(22, (box.height() - 32) / 6));
+        return Math.max(16, Math.min(22, (box.height() - 32) / 7));
     }
     private boolean hit(String id, double x, double y) {
         var box = controlBounds(id);
@@ -193,25 +204,44 @@ public final class SidebarPanel {
             drawControl(graphics, theme, "mapping_selector", "映射", mouseX, mouseY);
             clippedText(graphics, font, "供应器 · 右键备注", box.x() + 7, box.y() + 63, box.width() - 43, theme.muted());
             graphics.drawString(font, "空槽", box.x() + box.width() - 8 - font.width("空槽"), box.y() + 63, theme.muted(), false);
-            var filtered = visibleEntries();
+            var filtered = visibleRows();
             int shown = PanelGeometry.rowCount(box);
             firstRow = Math.max(0, Math.min(firstRow, Math.max(0, filtered.size() - shown)));
             SidebarPackets.Entry hovered = null;
             boolean hoveredIcon = false;
             boolean hoveredFavorite = false;
+            String hoveredGroup = null;
             boolean uploadEnabled = SidebarClient.canUpload();
             for (int row = 0; row < shown && firstRow + row < filtered.size(); row++) {
-                var entry = filtered.get(firstRow + row);
+                var item = filtered.get(firstRow + row);
+                var entry = item.members().getFirst();
                 var bounds = controlBounds("row" + row);
                 boolean hover = bounds.contains(mouseX, mouseY);
+                if (item.header()) {
+                    theme.providerRow(graphics, bounds.x(), bounds.y(), bounds.width(), bounds.height(), true, hover);
+                    if (item.members().stream().anyMatch(SidebarMappings::matches))
+                        graphics.fill(bounds.x() + 1, bounds.y() + 2, bounds.x() + 3, bounds.y() + bounds.height() - 2, theme.selection());
+                    boolean expanded = expandedGroups.contains(item.key());
+                    String label = (expanded ? "− " : "+ ") + SidebarNotes.displayName(entry);
+                    graphics.renderItem(SidebarNotes.icon(entry), bounds.x() + 4, bounds.y() + 5);
+                    clippedText(graphics, font, label, bounds.x() + 24, bounds.y() + 4, bounds.width() - 28, theme.buttonText(true), theme.buttonShadow());
+                    long free = item.members().stream().mapToLong(SidebarPackets.Entry::freeSlots).sum();
+                    long total = item.members().stream().mapToLong(SidebarPackets.Entry::totalSlots).sum();
+                    clippedText(graphics, font, "×" + item.members().size() + "  " + free + "/" + total,
+                        bounds.x() + 24, bounds.y() + 14, bounds.width() - 28, theme.buttonText(true));
+                    if (hover) hoveredGroup = SidebarNotes.displayName(entry) + " × " + item.members().size()
+                        + (expanded ? " · 点击折叠" : " · 点击展开后选择供应器");
+                    continue;
+                }
                 boolean enabled = uploadEnabled && entry.freeSlots() > 0 || SidebarNotes.canEdit(entry) || SidebarNotes.canEditIcon(entry);
                 theme.providerRow(graphics, bounds.x(), bounds.y(), bounds.width(), bounds.height(), enabled, hover);
+                if (item.child()) graphics.fill(bounds.x() + 1, bounds.y() + 3, bounds.x() + 2, bounds.y() + bounds.height() - 3, theme.muted());
                 if (providerView || SidebarMappings.matches(entry))
                     graphics.fill(bounds.x() + 1, bounds.y() + 2, bounds.x() + 3, bounds.y() + bounds.height() - 2, theme.selection());
                 graphics.renderItem(SidebarNotes.icon(entry), bounds.x() + 4, bounds.y() + 5);
                 clippedText(graphics, font, SidebarNotes.displayName(entry), bounds.x() + 24, bounds.y() + 4, bounds.width() - 47,
                     theme.buttonText(enabled), theme.buttonShadow());
-                graphics.drawString(font, entry.freeSlots() + "/" + entry.totalSlots(), bounds.x() + 24, bounds.y() + 15,
+                graphics.drawString(font, entry.freeSlots() + "/" + entry.totalSlots(), bounds.x() + 24, bounds.y() + 14,
                     entry.freeSlots() > 0 ? theme.positive() : theme.negative(), theme.buttonShadow());
                 graphics.drawString(font, SidebarNotes.favorite(entry) ? "★" : "☆",
                     bounds.x() + bounds.width() - 15, bounds.y() + 9,
@@ -234,7 +264,8 @@ public final class SidebarPanel {
             String status = !iconFeedback.isEmpty() ? iconFeedback
                 : !noteError.isEmpty() ? noteError : persistenceError.isEmpty() ? SidebarClient.status() : persistenceError;
             clippedText(graphics, font, status, box.x() + 7, footerY + 14, box.width() - 14, theme.muted());
-            if (hovered != null) {
+            if (hoveredGroup != null) graphics.renderTooltip(font, Component.literal(hoveredGroup), mouseX, mouseY);
+            else if (hovered != null) {
                 String note = SidebarNotes.note(hovered);
                 if (hoveredFavorite) graphics.renderTooltip(font,
                     Component.literal(SidebarNotes.favorite(hovered) ? "点击取消收藏置顶 · 仅自己可见" : "点击收藏置顶 · 仅自己可见"), mouseX, mouseY);
@@ -273,9 +304,11 @@ public final class SidebarPanel {
         for (String id : List.of("width_plus", "rows_plus")) drawControl(graphics, theme, id, "+", mouseX, mouseY);
         drawControl(graphics, theme, "reset", "重置位置 / 解锁", mouseX, mouseY);
         drawControl(graphics, theme, "mappings", "管理机器映射", mouseX, mouseY);
-        if (box.height() >= 184) clippedText(graphics, font, persistenceError.isEmpty() ? "修改自动保存" : persistenceError,
-            box.x() + 8, box.y() + 169, box.width() - 16, theme.muted());
+        drawControl(graphics, theme, "grouping", "同类合并：" + (preferences.groupProviders() ? "开" : "关"), mouseX, mouseY);
+        if (box.height() >= 206) clippedText(graphics, font, persistenceError.isEmpty() ? "修改自动保存" : persistenceError,
+            box.x() + 8, box.y() + 188, box.width() - 16, theme.muted());
         if (hit("theme", mouseX, mouseY)) graphics.renderTooltip(font, Component.literal("AE2 使用 AE2 纹理；原版主题跟随原版界面资源包（含 Cozy）"), mouseX, mouseY);
+        else if (hit("grouping", mouseX, mouseY)) graphics.renderTooltip(font, Component.literal("同原名、同备注的供应器合并；收藏单独分组。点击展开后选择具体目标"), mouseX, mouseY);
         else if (hit("height", mouseX, mouseY)) graphics.renderTooltip(font, Component.literal("紧凑固定 3 行；标准使用自定行数；跟随终端使用终端高度"), mouseX, mouseY);
         else if (hit("rows_minus", mouseX, mouseY) || hit("rows_plus", mouseX, mouseY)) graphics.renderTooltip(font, Component.literal("修改行数会切换到标准高度；屏幕不足时自动减少可见行"), mouseX, mouseY);
         else renderHeaderTooltip(graphics, mouseX, mouseY);
@@ -331,10 +364,16 @@ public final class SidebarPanel {
             SidebarMappings.openSelector(screen);
             return;
         }
-        var filtered = visibleEntries();
+        var filtered = visibleRows();
+        firstRow = Math.max(0, Math.min(firstRow, Math.max(0, filtered.size() - PanelGeometry.rowCount(box))));
         for (int row = 0; row < PanelGeometry.rowCount(box); row++) {
             if (hit("row" + row, mouseX, mouseY) && firstRow + row < filtered.size()) {
-                var entry = filtered.get(firstRow + row);
+                var item = filtered.get(firstRow + row);
+                if (item.header()) {
+                    if (button == 0 && !expandedGroups.remove(item.key())) expandedGroups.add(item.key());
+                    return;
+                }
+                var entry = item.members().getFirst();
                 noteError = "";
                 iconFeedback = "";
                 if (hit("favorite" + row, mouseX, mouseY)) {
@@ -378,6 +417,7 @@ public final class SidebarPanel {
         else if (hit("width_plus", x, y)) preferences.setWidth(preferences.width() + 16);
         else if (hit("rows_minus", x, y)) preferences.setRows(preferences.rows() - 1);
         else if (hit("rows_plus", x, y)) preferences.setRows(preferences.rows() + 1);
+        else if (hit("grouping", x, y)) preferences.setGroupProviders(!preferences.groupProviders());
         else if (hit("reset", x, y)) { preferences.resetPosition(); settingsOpen = false; dragging = false; }
         else if (hit("mappings", x, y)) { SidebarMappings.openManager(screen); return; }
         else return;
@@ -401,7 +441,7 @@ public final class SidebarPanel {
 
     void scroll(double delta) {
         if (layout().collapsed() || settingsOpen || delta == 0) return;
-        int max = Math.max(0, visibleEntries().size() - PanelGeometry.rowCount(layout()));
+        int max = Math.max(0, visibleRows().size() - PanelGeometry.rowCount(layout()));
         firstRow = Math.max(0, Math.min(max, firstRow + (delta > 0 ? -1 : 1)));
     }
     void unfocus() { search.setFocused(false); }

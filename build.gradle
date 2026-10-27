@@ -4,48 +4,71 @@ plugins {
 }
 group = 'dev.echo.uploadsidebar'
 version = providers.gradleProperty('mod_version').get()
+def gameVersion = providers.gradleProperty('gameVersion').getOrElse('1.21.1')
+if (!(gameVersion in ['1.21', '1.21.1'])) throw new GradleException('Unsupported gameVersion')
+def runtimeNeoForge = gameVersion == '1.21' ? '21.0.167' : '21.1.241'
+def smokeDirectory = file('compatibility/' + gameVersion + '/run-test')
+def smokeArtifact = providers.gradleProperty('smokeArtifact').orNull
+if (smokeArtifact && (!file(smokeArtifact).isFile()
+        || !providers.gradleProperty('smoke').getOrElse('false').toBoolean()))
+    throw new GradleException('smokeArtifact requires an existing JAR and smoke=true')
+def metadata = [modVersion: project.version.toString(),
+    minecraftRange: '[1.21,1.21.2)', neoForgeRange: '[21.0.167,21.2)',
+    ae2Range: '[19.0.10-alpha,20)']
+if (gameVersion == '1.21') layout.buildDirectory = file('build-compat-1.21')
 java { toolchain.languageVersion = JavaLanguageVersion.of(21); withSourcesJar() }
 repositories { mavenCentral() }
 sourceSets {
     smoke {
         compileClasspath += sourceSets.main.output + sourceSets.main.compileClasspath
-        runtimeClasspath += sourceSets.main.output + sourceSets.main.runtimeClasspath
+        runtimeClasspath += smokeArtifact ? (sourceSets.main.runtimeClasspath - sourceSets.main.output) : sourceSets.main.runtimeClasspath
     }
 }
 neoForge {
-    version = '21.1.241'
+    version = runtimeNeoForge
     runs {
         client {
             client()
-            gameDirectory = file('run-test')
+            if (smokeArtifact) sourceSet = sourceSets.smoke
+            gameDirectory = smokeDirectory
             jvmArguments.add('-Xmx3G')
-            jvmArguments.add('-Dsidebar.smoke.directory=' + file('run-test').absolutePath)
+            jvmArguments.add('-Dsidebar.smoke.directory=' + smokeDirectory.absolutePath)
+            if (smokeArtifact) jvmArguments.add('-Dsidebar.smoke.artifact=' + file(smokeArtifact).absolutePath)
             jvmArguments.add('-Dsidebar.smoke.plus=' + providers.gradleProperty('plus').getOrElse('false'))
             jvmArguments.add('-Dsidebar.smoke.cozy=' + providers.gradleProperty('cozy').getOrElse('false'))
+            jvmArguments.add('-Dsidebar.smoke.minimal=' + providers.gradleProperty('minimal').getOrElse('false'))
+            jvmArguments.add('-Dsidebar.smoke.guideMe=' + providers.gradleProperty('guideMe').getOrElse('true'))
             boolean cozySmoke = providers.gradleProperty('cozy').getOrElse('false').toBoolean()
             programArguments.addAll('--width', cozySmoke ? '1920' : '1440', '--height', cozySmoke ? '1080' : '900')
         }
     }
     mods {
-        ae2_upload_sidebar { sourceSet sourceSets.main }
+        if (!smokeArtifact) ae2_upload_sidebar { sourceSet sourceSets.main }
         if (providers.gradleProperty('smoke').getOrElse('false').toBoolean()) {
             sidebar_smoke { sourceSet sourceSets.smoke }
         }
     }
 }
 def packMods = file(providers.gradleProperty('packMods').getOrElse('test-dependencies'))
+def minimal = providers.gradleProperty('minimal').getOrElse('false').toBoolean()
+if (minimal && (providers.gradleProperty('plus').getOrElse('false').toBoolean()
+        || providers.gradleProperty('cozy').getOrElse('false').toBoolean()))
+    throw new GradleException('minimal cannot be combined with plus or cozy')
 dependencies {
+    if (smokeArtifact) runtimeOnly files(file(smokeArtifact))
     if (providers.gradleProperty('plus').getOrElse('false').toBoolean())
         runtimeOnly files(new File(packMods, 'extendedae_plus-1.6.2.jar'))
-    compileOnly files(new File(packMods, 'appliedenergistics2-19.2.17.jar'))
+    compileOnly files(new File(packMods, 'appliedenergistics2-' + providers.gradleProperty('ae2CompileVersion').getOrElse('19.0.10-alpha') + '.jar'))
     compileOnly files(new File(packMods, 'jei-1.21.1-neoforge-19.27.0.336.jar'))
     compileOnly files(new File(packMods, 'ae2jeiintegration-1.2.1.jar'))
-    runtimeOnly files([
+    runtimeOnly files((minimal ? [
+        'appliedenergistics2-' + providers.gradleProperty('ae2Version').getOrElse('19.2.17') + '.jar'
+    ] + (providers.gradleProperty('guideMe').getOrElse('true').toBoolean() ? ['guideme-21.1.16.jar'] : []) : [
         'appliedenergistics2-' + providers.gradleProperty('ae2Version').getOrElse('19.2.17') + '.jar',
         'ExtendedAE-1.21-2.2.32-neoforge.jar', 'Glodium-1.21-2.2-neoforge.jar',
         'guideme-21.1.16.jar', 'ae2utility-1.8.0.jar', 'ae2wtlib-19.5.0.jar',
         'jei-1.21.1-neoforge-19.27.0.336.jar', 'ae2jeiintegration-1.2.1.jar'
-    ].collect { new File(packMods, it) })
+    ]).collect { new File(packMods, it) })
     testImplementation 'org.junit.jupiter:junit-jupiter:5.12.2'
     testImplementation 'org.ow2.asm:asm:9.8'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.12.2'
@@ -57,12 +80,19 @@ tasks.named('test', Test) {
     systemProperty 'packMods', packMods.absolutePath
     systemProperty 'testAe2Version', providers.gradleProperty('ae2Version').getOrElse('19.2.17')
 }
-tasks.named('jar', Jar) { manifest { attributes('Implementation-Version': project.version) } }
+tasks.named('jar', Jar) {
+    manifest { attributes('Implementation-Version': metadata.modVersion) }
+
+}
 
 tasks.named('processResources', ProcessResources) {
-    inputs.property('modVersion', project.version)
+    inputs.properties(metadata)
     filesMatching('META-INF/neoforge.mods.toml') {
-        expand(modVersion: project.version)
+        expand(metadata)
     }
     from('LICENSE') { into 'META-INF/licenses'; rename { 'ae2-upload-sidebar-LICENSE' } }
+}
+tasks.named('processSmokeResources', ProcessResources) {
+    inputs.properties(metadata)
+    filesMatching('META-INF/neoforge.mods.toml') { expand(metadata) }
 }

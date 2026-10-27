@@ -47,6 +47,7 @@ final class LayoutInteractionAssertions {
                 clickControl(screen, "reset");
                 if (controlBounds("theme") == null) clickControl(screen, "settings");
                 if (preferences.theme() != SidebarPreferences.Theme.AE2) clickControl(screen, "theme");
+                if (preferences.groupProviders()) clickControl(screen, "grouping");
                 for (int attempt = 0; preferences.heightMode() != PanelGeometry.HeightMode.STANDARD && attempt < 3; attempt++) {
                     clickControl(screen, "height");
                 }

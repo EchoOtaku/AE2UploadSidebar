@@ -13,6 +13,8 @@ class SidebarPreferencesTest {
     @Test void settingsRoundTripAndResetOnlyChangesPlacement() throws Exception {
         Path file = directory.resolve("client.properties");
         SidebarPreferences settings = SidebarPreferences.load(file);
+        assertFalse(settings.groupProviders());
+        settings.setGroupProviders(true);
         settings.moveTo(.75, .2);
         settings.setLocked(true);
         settings.setCollapsed(true);
@@ -21,6 +23,7 @@ class SidebarPreferencesTest {
         settings.setTheme(SidebarPreferences.Theme.VANILLA);
         settings.save(file);
         var loaded = SidebarPreferences.load(file);
+        assertTrue(loaded.groupProviders());
         assertEquals(.75, loaded.x());
         assertEquals(.2, loaded.y());
         assertTrue(loaded.locked());
@@ -29,6 +32,7 @@ class SidebarPreferencesTest {
         assertEquals(7, loaded.rows());
         assertEquals(SidebarPreferences.Theme.VANILLA, loaded.theme());
         loaded.resetPosition();
+        assertTrue(loaded.groupProviders());
         assertEquals(-1, loaded.x());
         assertEquals(-1, loaded.y());
         assertFalse(loaded.collapsed());

@@ -43,7 +43,7 @@ public final class SidebarClient {
     private static SidebarSession session;
     private static SidebarPanel panel;
     private static List<SidebarPackets.Entry> entries = List.of();
-    private static String status = "正在连接服务器…";
+    private static String status = "ae2_upload_sidebar.status.connecting";
     private static boolean supported;
     private static final Set<Integer> panelButtons = new HashSet<>();
     private static boolean auxiliaryScreenOpen;
@@ -97,7 +97,7 @@ public final class SidebarClient {
                 && !hasValidAnnotationHost()) {
             entries = List.of();
             SidebarNotes.clear();
-            status = "当前供应器已变化，请重新打开";
+            status = "ae2_upload_sidebar.status.provider_changed";
             return false;
         }
         // Mapping configuration is client-only. Keep the exact terminal context
@@ -132,7 +132,7 @@ public final class SidebarClient {
             SidebarMappings.reset();
             panel = new SidebarPanel(current);
             entries = List.of();
-            status = "正在连接服务器…";
+            status = "ae2_upload_sidebar.status.connecting";
             supported = false;
             panelButtons.clear();
             nextQueryAt = 0;
@@ -178,7 +178,7 @@ public final class SidebarClient {
         auxiliaryScreenOpen = false;
         supported = false;
         nextQueryAt = 0;
-        status = "正在连接服务器…";
+        status = "ae2_upload_sidebar.status.connecting";
         SidebarMappings.reset();
         SidebarNotes.clear();
     }
@@ -202,13 +202,13 @@ public final class SidebarClient {
             cancelAutoUpload();
             session.invalidate();
             entries = List.of();
-            status = "服务器未启用样板上传";
+            status = "ae2_upload_sidebar.status.unsupported";
             return;
         }
         if (session.expire(time)) {
             cancelAutoUpload();
             entries = List.of();
-            status = "请求超时，正在重新读取";
+            status = "ae2_upload_sidebar.status.timeout_refresh";
             nextQueryAt = time + 1000;
         }
         if (autoUpload.observe(menu, patternFingerprint(), encodedCount(),
@@ -225,7 +225,7 @@ public final class SidebarClient {
     private static void query(long time) {
         long id = session.begin(SidebarSession.Operation.QUERY, time);
         if (id == 0) return;
-        status = "正在读取供应器…";
+        status = "ae2_upload_sidebar.status.reading";
         nextQueryAt = time + 3000;
         try {
             var connection = Minecraft.getInstance().getConnection();
@@ -235,7 +235,7 @@ public final class SidebarClient {
             if (named) PacketDistributor.sendToServer(new SidebarPackets.NamedQuery(menu.containerId, id));
             else PacketDistributor.sendToServer(new SidebarPackets.Query(menu.containerId, id));
         } catch (RuntimeException error) {
-            failRequest("读取失败，请稍后重试", error);
+            failRequest("ae2_upload_sidebar.status.read_failed", error);
         }
     }
 
@@ -261,7 +261,7 @@ public final class SidebarClient {
         var target = autoUpload.consume(menu, patternFingerprint(), SidebarMappings.enabledAutoUploadMapping(),
             now(), complete, entries, entry -> entry.freeSlots() > 0 && SidebarMappings.matches(entry));
         if (target != null) upload(target);
-        else status = "自动上传未执行：请手动选择供应器";
+        else status = "ae2_upload_sidebar.status.auto_skipped";
     }
 
     private static boolean acceptSnapshot(SidebarPackets.Providers response) {
@@ -276,7 +276,7 @@ public final class SidebarClient {
                 entry.totalSlots(), entry.icon().copyWithCount(1)))
             .sorted(Comparator.comparing(SidebarPackets.Entry::name, String.CASE_INSENSITIVE_ORDER))
             .toList();
-        status = entries.isEmpty() ? message(response.message(), "没有可用的供应器") : "点击供应器上传 1 张";
+        status = entries.isEmpty() ? message(response.message(), "ae2_upload_sidebar.status.no_providers") : "ae2_upload_sidebar.status.click_upload";
         nextQueryAt = now() + 3000;
         return true;
     }
@@ -286,7 +286,7 @@ public final class SidebarClient {
         if (!session.accept(Minecraft.getInstance().player.containerMenu,
                 response.menuId(), response.operationId(), SidebarSession.Operation.UPLOAD)) return;
         entries = List.of();
-        status = response.success() ? "已上传 1 张样板" : message(response.message(), "上传失败，请重试");
+        status = response.success() ? "ae2_upload_sidebar.status.uploaded" : message(response.message(), "ae2_upload_sidebar.status.upload_failed");
         nextQueryAt = now() + 750;
     }
 
@@ -298,7 +298,7 @@ public final class SidebarClient {
         }
         if (session.expire(now())) {
             entries = List.of();
-            status = "请求已超时，响应已忽略";
+            status = "ae2_upload_sidebar.status.expired_response";
             nextQueryAt = now() + 1000;
             return false;
         }
@@ -311,17 +311,17 @@ public final class SidebarClient {
         if (entry.freeSlots() <= 0 || entries.stream().noneMatch(current -> current.token().equals(entry.token()))) return;
         ItemStack expectedPattern = encodedPattern();
         if (expectedPattern.isEmpty()) {
-            status = "请先在终端编码样板";
+            status = "ae2_upload_sidebar.status.encode_first";
             return;
         }
         long operationId = session.begin(SidebarSession.Operation.UPLOAD, now());
         if (operationId == 0) return;
-        status = "正在上传 1 张样板…";
+        status = "ae2_upload_sidebar.status.uploading";
         try {
             PacketDistributor.sendToServer(new SidebarPackets.Upload(
                 menu.containerId, operationId, entry.token(), expectedPattern));
         } catch (RuntimeException error) {
-            failRequest("上传请求失败，请重试", error);
+            failRequest("ae2_upload_sidebar.status.request_failed", error);
         }
     }
 
@@ -351,7 +351,7 @@ public final class SidebarClient {
     }
 
     static List<SidebarPackets.Entry> entries() { return entries; }
-    static String status() { return status; }
+    static String status() { return SidebarText.resolve(status); }
     static boolean canUpload() { return isEnabled() && !isProviderView() && supported && session != null && session.canUpload() && !encodedPattern().isEmpty(); }
 
     public static boolean supportsScreen(Screen candidate) {
@@ -371,7 +371,7 @@ public final class SidebarClient {
         var resolved = OpenedProvider.resolve(screen);
         if (resolved.isEmpty()) {
             entries = List.of(); SidebarNotes.clear();
-            status = "无法确定当前供应器，请重新打开";
+            status = "ae2_upload_sidebar.status.provider_unknown";
             return;
         }
         boolean first = openedProvider == null;
@@ -382,20 +382,20 @@ public final class SidebarClient {
         entries = List.of(entry);
         if (first) SidebarNotes.accept(menu, entries, List.of(new SidebarPackets.Identity(openedProviderToken,
             openedProvider.identity().key(), openedProvider.identity().location())), true);
-        status = "左 / 右键备注；拖物品换图标";
+        status = "ae2_upload_sidebar.status.edit_provider";
     }
 
     private static String message(String message, String fallback) {
         if (message == null || message.isBlank() || "OK".equals(message)) return fallback;
         return switch (message) {
-            case "NO_GRID", "GRID_UNAVAILABLE" -> "ME 网络暂不可用";
-            case "NO_PATTERN", "INVALID_PATTERN", "NO_ENCODED_PATTERN" -> "请先在终端编码样板";
-            case "FULL", "TARGET_FULL", "PROVIDER_FULL" -> "供应器已满，请重新选择";
-            case "STALE_TOKEN", "INVALID_TOKEN", "TOKEN_EXPIRED" -> "供应器已变化，正在刷新";
-            case "WRONG_MENU", "INVALID_MENU", "MENU_CHANGED" -> "终端已变化，请重新打开";
-            case "PATTERN_CHANGED" -> "样板已变化，请重新选择";
-            case "NO_PERMISSION", "ACCESS_DENIED" -> "没有访问 ME 网络的权限";
-            default -> message;
+            case "NO_GRID", "GRID_UNAVAILABLE" -> "ae2_upload_sidebar.status.grid_unavailable";
+            case "NO_PATTERN", "INVALID_PATTERN", "NO_ENCODED_PATTERN" -> "ae2_upload_sidebar.status.encode_first";
+            case "FULL", "TARGET_FULL", "PROVIDER_FULL" -> "ae2_upload_sidebar.status.provider_full";
+            case "STALE_TOKEN", "INVALID_TOKEN", "TOKEN_EXPIRED" -> "ae2_upload_sidebar.status.refreshing";
+            case "WRONG_MENU", "INVALID_MENU", "MENU_CHANGED" -> "ae2_upload_sidebar.status.menu_changed";
+            case "PATTERN_CHANGED" -> "ae2_upload_sidebar.status.pattern_changed";
+            case "NO_PERMISSION", "ACCESS_DENIED" -> "ae2_upload_sidebar.status.no_permission";
+            default -> dev.echo.uploadsidebar.core.ServerMessages.localizationKey(message);
         };
     }
 

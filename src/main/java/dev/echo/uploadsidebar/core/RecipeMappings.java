@@ -37,7 +37,7 @@ public final class RecipeMappings {
         } catch (IOException | RuntimeException failure) {
             mappings.clear();
             available = false;
-            error = "映射读取或导入失败，原文件已保留，请检查配置后重启游戏";
+            error = "ae2_upload_sidebar.error.mappings.read";
         }
     }
 
@@ -46,7 +46,7 @@ public final class RecipeMappings {
     }
     public String error() { return error; }
     public boolean put(String key, String value) {
-        if (!available || !valid(key) || !valid(value)) { error = "映射未保存：名称需为 1～512 字符，不能包含控制符"; return false; }
+        if (!available || !valid(key) || !valid(value)) { error = "ae2_upload_sidebar.error.mappings.invalid"; return false; }
         var next = new TreeMap<>(mappings);
         next.put(normalize(key), value.strip());
         return persist(next);
@@ -82,7 +82,7 @@ public final class RecipeMappings {
             mappings.clear(); mappings.putAll(next); error = "";
             return true;
         } catch (IOException | RuntimeException failure) {
-            error = "映射未保存，原文件已保留；若配置被外部修改，请重启游戏";
+            error = "ae2_upload_sidebar.error.mappings.save";
             return false;
         } finally {
             if (temporary != null) try { Files.deleteIfExists(temporary); } catch (IOException ignored) { }

@@ -16,7 +16,7 @@ public final class MappingAutoUploadStore {
     public boolean set(String scope, String key, String value, boolean enabled) {
         return storage.save(scope, identity(key, value), enabled ? "enabled" : "");
     }
-    public String error() { return storage.error() == null ? "" : "自动上传设置无法保存，请检查配置文件"; }
+    public String error() { return storage.error() == null ? "" : "ae2_upload_sidebar.error.auto_upload.save"; }
     private static String identity(String key, String value) {
         try {
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")

@@ -37,8 +37,8 @@ final class ClientInteractionAssertions {
             require(client.screen == originalScreen && client.player.containerMenu == originalMenu,
                     "upload must retain the real terminal screen and menu");
             int count = screen.getMenu().getSlots(SlotSemantics.ENCODED_PATTERN).getFirst().getItem().getCount();
-            String status = (String) field(SidebarClient.class, null, "status");
-            if (count == 2 && status.equals("已上传 1 张样板")) {
+            String status = dev.echo.uploadsidebar.client.SidebarText.resolve((String) field(SidebarClient.class, null, "status"));
+            if (count == 2 && status.equals(dev.echo.uploadsidebar.client.SidebarText.text("status.uploaded"))) {
                 completed = true;
                 return true;
             }

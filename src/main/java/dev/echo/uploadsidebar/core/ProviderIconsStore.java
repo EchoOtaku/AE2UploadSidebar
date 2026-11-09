@@ -48,7 +48,8 @@ public final class ProviderIconsStore {
             icons = loaded;
         } catch (IOException | IllegalArgumentException | SecurityException failure) {
             available = false;
-            error = "图标文件读取失败，已停止写入以保留原文件：" + failure.getClass().getSimpleName();
+            error = "ae2_upload_sidebar.error.icons.read";
+            System.getLogger(ProviderIconsStore.class.getName()).log(System.Logger.Level.WARNING, "Cannot read private icons", failure);
         }
     }
 
@@ -64,7 +65,7 @@ public final class ProviderIconsStore {
         if (!available) return false;
         String value = json == null || json.isBlank() ? "" : json;
         if (!validKey(scope, identity) || !value.isEmpty() && !validPayload(value)) {
-            error = "图标数据或位置标识无效；每个图标最多 16 KiB UTF-8 数据";
+            error = "ae2_upload_sidebar.error.icons.invalid";
             return false;
         }
         Properties next = new Properties();
@@ -92,7 +93,8 @@ public final class ProviderIconsStore {
             error = null;
             return true;
         } catch (IOException | SecurityException failure) {
-            error = "图标未保存，原内容已保留：" + failure.getMessage();
+            error = "ae2_upload_sidebar.error.icons.save";
+            System.getLogger(ProviderIconsStore.class.getName()).log(System.Logger.Level.WARNING, "Cannot save private icons", failure);
             return false;
         } finally {
             if (temporary != null) {

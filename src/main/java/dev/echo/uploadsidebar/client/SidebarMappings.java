@@ -34,7 +34,7 @@ public final class SidebarMappings {
     private static Object menu;
     private static AEItemKey patternKey;
     private static Recipe<?> recipe;
-    private static String unknownReason = "机器未知：从 JEI 转入或手动搜索";
+    private static String unknownReason = SidebarText.PREFIX + "mappings.reason.unknown";
     private static boolean warned;
     private static boolean automaticMapped;
     private static RecipeTypeMapping automaticMapping;
@@ -49,7 +49,7 @@ public final class SidebarMappings {
     }
 
     public static boolean usesEaep() { return ModList.get().isLoaded("extendedae_plus"); }
-    public static String mappingSource() { return usesEaep() ? "EAEP 共用映射" : "独立映射"; }
+    public static String mappingSource() { return SidebarText.text(usesEaep() ? "mappings.source.eaep" : "mappings.source.standalone"); }
     public static boolean removeAlias(String key) {
         try { return usesEaep() ? EaepMappings.remove(key) : mappingStore().remove(key); }
         catch (RuntimeException error) { report(error); return false; }
@@ -93,7 +93,7 @@ public final class SidebarMappings {
         if (!Objects.equals(patternKey, next)) {
             patternKey = next;
             recipe = null;
-            unknownReason = "机器未知：从 JEI 转入或手动搜索";
+            unknownReason = SidebarText.PREFIX + "mappings.reason.unknown";
             if (next != null) resolveRecipe(pattern);
         }
         String key = "";
@@ -102,10 +102,10 @@ public final class SidebarMappings {
         if (recipe != null) {
             try {
                 key = automaticKey(recipe);
-                if (key.isEmpty()) unknownReason = "配方类别名称不可用，可手动选择";
+                if (key.isEmpty()) unknownReason = SidebarText.PREFIX + "mappings.reason.category_unavailable";
             } catch (RuntimeException error) {
                 report(error);
-                unknownReason = "映射读取失败，可手动选择";
+                unknownReason = SidebarText.PREFIX + "mappings.reason.read_failed";
             }
         }
         if (recipe == null && next != null) {
@@ -133,14 +133,14 @@ public final class SidebarMappings {
             else if (smithing != null) recipeId = smithing.recipeId();
             if (recipeId == null) return;
             if (PatternDetailsHelper.decodePattern(pattern, level) == null) {
-                unknownReason = "样板配方无效：请选择映射";
+                unknownReason = SidebarText.PREFIX + "mappings.reason.invalid_recipe";
                 return;
             }
             recipe = level.getRecipeManager().byKey(recipeId).map(holder -> holder.value()).orElse(null);
-            if (recipe == null) unknownReason = "配方未找到：请选择映射";
+            if (recipe == null) unknownReason = SidebarText.PREFIX + "mappings.reason.recipe_missing";
         } catch (RuntimeException error) {
             report(error);
-            unknownReason = "配方无法识别：请选择映射";
+            unknownReason = SidebarText.PREFIX + "mappings.reason.unrecognized_recipe";
         }
     }
 
@@ -183,10 +183,10 @@ public final class SidebarMappings {
     public static String hint() {
         var current = selection.current();
         return switch (current.source()) {
-            case EMPTY -> "先编码样板，再匹配机器";
-            case AUTOMATIC -> (automaticMapped ? "自动映射：" : "配方类别：") + current.key();
-            case MANUAL -> "手选映射：" + current.key();
-            case UNKNOWN -> unknownReason;
+            case EMPTY -> SidebarText.text("mappings.hint.empty");
+            case AUTOMATIC -> SidebarText.text(automaticMapped ? "mappings.hint.automatic" : "mappings.hint.category", current.key());
+            case MANUAL -> SidebarText.text("mappings.hint.manual", current.key());
+            case UNKNOWN -> SidebarText.resolve(unknownReason);
         };
     }
 
@@ -261,7 +261,7 @@ public final class SidebarMappings {
         automaticMapping = null;
         selection.capture(null, null, "");
         auxiliaryScreens.clear();
-        unknownReason = "机器未知：从 JEI 转入或手动搜索";
+        unknownReason = SidebarText.PREFIX + "mappings.reason.unknown";
     }
 
     private static String clean(String text) { return text == null ? "" : text.strip(); }
@@ -283,7 +283,7 @@ public final class SidebarMappings {
         private String saveError = "";
 
         private MappingSelectorScreen(Screen parent, Object expectedMenu) {
-            super(Component.literal("选择机器映射"));
+            super(SidebarText.component("mappings.selector.title"));
             this.parent = parent;
             this.expectedMenu = expectedMenu;
         }
@@ -294,13 +294,13 @@ public final class SidebarMappings {
             int left = (width - contentWidth) / 2;
             smallViewport = width < 280 || height < 134;
             if (smallViewport) {
-                addRenderableWidget(Button.builder(Component.literal("返回"), button -> onClose())
+                addRenderableWidget(Button.builder(SidebarText.component("mappings.back"), button -> onClose())
                     .bounds(left, Math.max(0, height - 24), contentWidth, Math.min(20, height)).build());
                 return;
             }
             pageSize = Math.max(1, Math.min(8, (height - 112) / 22));
             page = Math.max(0, Math.min(page, Math.max(0, (mappings.size() - 1) / pageSize)));
-            addRenderableWidget(Button.builder(Component.literal("自动识别（清除手选）"), button -> choose(""))
+            addRenderableWidget(Button.builder(SidebarText.component("mappings.selector.automatic"), button -> choose(""))
                 .bounds(left, 42, contentWidth, 18).build());
             for (int row = 0; row < pageSize; row++) {
                 int index = page * pageSize + row;
@@ -312,7 +312,7 @@ public final class SidebarMappings {
                 choice.active = selection.current().source() != ProviderRecommendations.Source.EMPTY;
                 choice.setTooltip(Tooltip.create(Component.literal(label)));
                 Button toggle = addRenderableWidget(Button.builder(
-                    Component.literal(autoUploadEnabled(mapping) ? "自动上传：开" : "自动上传：关"), button -> {
+                    SidebarText.component(autoUploadEnabled(mapping) ? "mappings.auto_upload.on" : "mappings.auto_upload.off"), button -> {
                         if (!validMenu()) { onClose(); return; }
                         if (!availableMappings().contains(mapping)) { rebuildWidgets(); return; }
                         boolean saved = autoUploadStore().set(SidebarNotes.currentScope(), mapping.key(), mapping.value(),
@@ -320,19 +320,19 @@ public final class SidebarMappings {
                         saveError = saved ? "" : autoUploadStore().error();
                         rebuildWidgets();
                     }).bounds(left + contentWidth - 84, 64 + row * 22, 84, 18).build());
-                toggle.setTooltip(Tooltip.create(Component.literal("编码后唯一匹配时上传 1 张；多目标手选。仅当前世界/服务器，默认关闭。")));
+                toggle.setTooltip(Tooltip.create(SidebarText.component("mappings.auto_upload.tooltip")));
             }
             int bottom = 66 + pageSize * 22;
             int pageButtonWidth = Math.min(70, contentWidth / 2 - 3);
-            Button previous = addRenderableWidget(Button.builder(Component.literal("上一页"), button -> changePage(-1))
+            Button previous = addRenderableWidget(Button.builder(SidebarText.component("mappings.previous"), button -> changePage(-1))
                 .bounds(left, bottom, pageButtonWidth, 18).build());
             previous.active = page > 0;
-            Button next = addRenderableWidget(Button.builder(Component.literal("下一页"), button -> changePage(1))
+            Button next = addRenderableWidget(Button.builder(SidebarText.component("mappings.next"), button -> changePage(1))
                 .bounds(left + contentWidth - pageButtonWidth, bottom, pageButtonWidth, 18).build());
             next.active = (page + 1) * pageSize < mappings.size();
-            addRenderableWidget(Button.builder(Component.literal("管理映射…"), button -> openManager(this))
+            addRenderableWidget(Button.builder(SidebarText.component("mappings.selector.manage"), button -> openManager(this))
                 .bounds(left, bottom + 24, contentWidth / 2 - 3, 20).build());
-            addRenderableWidget(Button.builder(Component.literal("返回"), button -> onClose())
+            addRenderableWidget(Button.builder(SidebarText.component("mappings.back"), button -> onClose())
                 .bounds(left + contentWidth / 2 + 3, bottom + 24, contentWidth / 2 - 3, 20).build());
         }
 
@@ -369,12 +369,13 @@ public final class SidebarMappings {
             // In 1.21.1 Screen.render draws the background, so labels must follow it.
             super.render(graphics, mouseX, mouseY, partialTick);
             if (width >= 100 && height >= 80) {
-                graphics.drawCenteredString(font, title.getString() + " · " + mappingSource(), width / 2, 10, 0xffffff);
-                String detail = !saveError.isEmpty() ? saveError : !mappingError().isEmpty() ? mappingError() : smallViewport ? "请降低界面缩放以选择映射" : "逐条开启：编码后仅唯一匹配时自动上传";
+                graphics.drawCenteredString(font, SidebarText.text("mappings.selector.heading", title, mappingSource()), width / 2, 10, 0xffffff);
+                String detail = !saveError.isEmpty() ? SidebarText.resolve(saveError) : !mappingError().isEmpty() ? SidebarText.resolve(mappingError())
+                    : SidebarText.text(smallViewport ? "mappings.selector.small_viewport" : "mappings.selector.instructions");
                 if (font.width(detail) > width - 24) detail = font.plainSubstrByWidth(detail, Math.max(1, width - 32)) + "…";
                 graphics.drawCenteredString(font, detail, width / 2, 26, 0xc6c6c6);
                 if (!smallViewport && mappings.isEmpty())
-                    graphics.drawCenteredString(font, "暂无映射，请点击管理映射", width / 2, 69, 0xc6c6c6);
+                    graphics.drawCenteredString(font, SidebarText.text("mappings.selector.empty"), width / 2, 69, 0xc6c6c6);
             }
         }
     }

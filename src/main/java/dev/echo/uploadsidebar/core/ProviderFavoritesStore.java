@@ -12,6 +12,6 @@ public final class ProviderFavoritesStore {
         return store.save(scope, identity, favorite ? "1" : "");
     }
     public String error() {
-        return store.error() == null ? "收藏未保存" : store.error().replace("备注", "收藏");
+        return store.error() == null ? "ae2_upload_sidebar.error.favorites.unsaved" : store.error().replace("error.notes.", "error.favorites.");
     }
 }

@@ -34,7 +34,7 @@ public final class SidebarNotes {
     public static boolean toggleFavorite(SidebarPackets.Entry entry) {
         var identity = sameContext() && metadataSupported ? identities.get(entry.token()) : null;
         if (identity == null || !scope.equals(currentScope())) {
-            favoriteError = "请等待供应器刷新；收藏需要可靠的位置标识";
+            favoriteError = "ae2_upload_sidebar.notes.favorite_unavailable";
             return false;
         }
         boolean saved = favorites().set(scope, identity.key(), !favorite(entry));
@@ -42,7 +42,7 @@ public final class SidebarNotes {
         return saved;
     }
 
-    public static String favoriteError() { return favoriteError; }
+    public static String favoriteError() { return SidebarText.resolve(favoriteError); }
     private static ProviderNotesStore store;
     private static ProviderIconsStore iconsStore;
     private static final Map<String, ItemStack> decodedIcons = new HashMap<>();
@@ -133,17 +133,19 @@ public final class SidebarNotes {
         return sameContext() && metadataSupported && identities.containsKey(entry.token()) && store().available();
     }
 
-    public static String unavailableReason() {
-        if (!SidebarClient.isEnabled()) return "侧栏已关闭";
-        if (!sameContext()) return "请等待供应器刷新后再编辑备注";
-        if (!metadataSupported) return "房主需更新至支持备注的补丁；原上传功能仍可使用";
+    public static String unavailableReason() { return SidebarText.resolve(unavailableReasonKey()); }
+
+    static String unavailableReasonKey() {
+        if (!SidebarClient.isEnabled()) return "ae2_upload_sidebar.notes.disabled";
+        if (!sameContext()) return "ae2_upload_sidebar.notes.wait_refresh";
+        if (!metadataSupported) return "ae2_upload_sidebar.notes.update_host";
         if (store != null && !store.available()) return store.error();
-        return "此供应器暂无唯一、可靠的位置标识，不能保存备注";
+        return "ae2_upload_sidebar.notes.no_identity";
     }
 
     public static String locationLabel(SidebarPackets.Entry entry) {
         var identity = sameContext() ? identities.get(entry.token()) : null;
-        return identity == null ? "位置未知" : identity.location();
+        return identity == null ? SidebarText.text("notes.unknown_location") : identity.location();
     }
 
     /** Read-only positioning remains available even if a private notes/icons file cannot be written. */
@@ -154,7 +156,7 @@ public final class SidebarNotes {
 
     public static boolean save(SidebarPackets.Entry entry, String text) {
         if (!canEdit(entry) || !scope.equals(currentScope())) {
-            lastError = unavailableReason();
+            lastError = unavailableReasonKey();
             return false;
         }
         boolean saved = store().save(scope, identities.get(entry.token()).key(), text);
@@ -162,7 +164,8 @@ public final class SidebarNotes {
         return saved;
     }
 
-    public static String error() { return lastError == null ? "备注未保存" : lastError; }
+    static String errorKey() { return lastError == null ? "ae2_upload_sidebar.notes.unsaved" : lastError; }
+    public static String error() { return SidebarText.resolve(errorKey()); }
 
     /** Detached display-only copy: never mutate the source or the server snapshot. */
     public static ItemStack icon(SidebarPackets.Entry entry) {
@@ -185,7 +188,7 @@ public final class SidebarNotes {
 
     public static boolean saveIcon(SidebarPackets.Entry entry, ItemStack selected) {
         if (selected == null || selected.isEmpty()) {
-            lastIconError = "请选择物品；恢复默认请使用 Shift＋右键图标";
+            lastIconError = "ae2_upload_sidebar.notes.select_icon";
             return false;
         }
         if (!validIconContext(entry)) return false;
@@ -193,7 +196,7 @@ public final class SidebarNotes {
             String json = ProviderIconCodec.encode(selected, Minecraft.getInstance().level.registryAccess());
             return persistIcon(entry, json);
         } catch (IllegalArgumentException exception) {
-            lastIconError = "此物品的数据无效或过大，图标未保存";
+            lastIconError = "ae2_upload_sidebar.notes.invalid_icon";
             return false;
         }
     }
@@ -204,10 +207,10 @@ public final class SidebarNotes {
 
     private static boolean validIconContext(SidebarPackets.Entry entry) {
         if (canEditIcon(entry) && scope.equals(currentScope())) return true;
-        if (!sameContext()) lastIconError = "终端已变化或侧栏已关闭，请刷新后重试";
-        else if (!metadataSupported) lastIconError = "房主需使用支持备注的 0.4 或更新补丁";
+        if (!sameContext()) lastIconError = "ae2_upload_sidebar.notes.context_changed";
+        else if (!metadataSupported) lastIconError = "ae2_upload_sidebar.notes.icon_update_host";
         else if (iconsStore != null && !iconsStore.available()) lastIconError = iconsStore.error();
-        else lastIconError = "此供应器暂无唯一、可靠的位置标识，不能保存图标";
+        else lastIconError = "ae2_upload_sidebar.notes.icon_no_identity";
         return false;
     }
 
@@ -218,12 +221,14 @@ public final class SidebarNotes {
         return saved;
     }
 
-    public static String iconError() {
+    public static String iconError() { return SidebarText.resolve(iconErrorKey()); }
+
+    private static String iconErrorKey() {
         if (lastIconError != null) return lastIconError;
-        if (!sameContext()) return "请等待供应器刷新；侧栏关闭时不能编辑图标";
-        if (!metadataSupported) return "房主需使用支持备注的 0.4 或更新补丁";
+        if (!sameContext()) return "ae2_upload_sidebar.notes.icon_wait_refresh";
+        if (!metadataSupported) return "ae2_upload_sidebar.notes.icon_update_host";
         if (iconsStore != null && !iconsStore.available()) return iconsStore.error();
-        return "此供应器暂无唯一、可靠的位置标识，不能保存图标";
+        return "ae2_upload_sidebar.notes.icon_no_identity";
     }
 
     static String currentScope() {

@@ -6,6 +6,7 @@ Upload encoded patterns to a chosen pattern provider directly from an AE2 Patter
 
 ## Features
 
+- English, Simplified Chinese and Traditional Chinese UI, following Minecraft’s language setting. Other locales fall back to English. Private labels and manually entered mappings retain their original text.
 - Upload one encoded pattern to a selected provider and see its available pattern slots.
 - Search original names and private labels, including full Chinese pinyin and initials.
 - Pin favorite providers with the star button. Favorites still respect the search filter.
@@ -20,7 +21,7 @@ Upload encoded patterns to a chosen pattern provider directly from an AE2 Patter
 
 ## Requirements
 
-Version 0.13.5-beta uses one JAR for Minecraft Java 1.21 and 1.21.1. Allowed ranges: NeoForge >=21.0.167 and <21.2; AE2 >=19.0.10-alpha and <20. Use the NeoForge and AE2 builds matching your Minecraft version and satisfy AE2's own dependencies. These ranges do not guarantee every intermediate or future version. Forge, Fabric, Minecraft 1.20.1 and 1.12.2 are not supported.
+Version 0.14.0-beta uses one JAR for Minecraft Java 1.21 and 1.21.1. Allowed ranges: NeoForge >=21.0.167 and <21.2; AE2 >=19.0.10-alpha and <20. Use the NeoForge and AE2 builds matching your Minecraft version and satisfy AE2's own dependencies. These ranges do not guarantee every intermediate or future version. Forge, Fabric, Minecraft 1.20.1 and 1.12.2 are not supported.
 
 Install the JAR in your instance's mods folder with the game closed. Remove the previous sidebar JAR when upgrading; keep only one version. Keep AE2's own dependencies installed.
 
@@ -36,7 +37,7 @@ Transfer processing recipes through JEI before encoding to capture their categor
 
 Client commands: /ae2sidebar off, /ae2sidebar on and /ae2sidebar unhighlight. No operator permissions required.
 
-Version 0.13.2-beta is a Beta. See the validation records below for tested combinations. Other modpack combinations are not guaranteed. The current UI is primarily in Chinese.
+Version 0.14.0-beta is a Beta. See the validation records below for tested combinations. Other modpack combinations are not guaranteed. This mod’s UI supports English, Simplified Chinese and Traditional Chinese. EAEP controls the language of its own management screen.
 
 The minimal installation is NeoForge, AE2, this mod, and any dependencies required by that AE2 version. AE2 19.0.x does not need GuideME; 19.2.0-beta introduced that dependency and requires GuideME 2.5.1. Follow the dependency declarations of your chosen AE2 version. Native terminal uploads and standalone mappings work without ExtendedAE, ExtendedAE Plus, JEI, AE2 JEI Integration, or AE2WTLib. Without JEI, native recipe categories fall back to type identifiers such as `crafting`; standalone mappings can translate them to machine names. Processing patterns without category context still require manual selection.
 

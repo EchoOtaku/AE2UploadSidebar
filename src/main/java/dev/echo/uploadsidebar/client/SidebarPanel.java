@@ -11,6 +11,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.function.Supplier;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -33,8 +34,8 @@ public final class SidebarPanel {
     private double dragOffsetX;
     private double dragOffsetY;
     private String persistenceError = "";
-    private String noteError = "";
-    private String iconFeedback = "";
+    private Supplier<String> noteError = () -> "";
+    private Supplier<String> iconFeedback = () -> "";
     private record GroupKey(String name, String note, boolean favorite) { }
     private final java.util.Set<GroupKey> expandedGroups = new java.util.HashSet<>();
 
@@ -48,13 +49,13 @@ public final class SidebarPanel {
         try { loaded = SidebarPreferences.load(preferencesPath); }
         catch (IOException | IllegalArgumentException error) {
             loaded = new SidebarPreferences();
-            persistenceError = "偏好读取失败，正在使用默认布局";
+            persistenceError = SidebarText.PREFIX + "panel.error.read_preferences";
             LogUtils.getLogger().warn("Cannot read AE2 sidebar client preferences", error);
         }
         preferences = loaded;
-        search = new EditBox(Minecraft.getInstance().font, 0, 0, 80, 16, Component.literal("搜索供应器"));
+        search = new EditBox(Minecraft.getInstance().font, 0, 0, 80, 16, SidebarText.component("panel.search.label"));
         search.setMaxLength(80);
-        search.setHint(Component.literal("搜索名称 / 拼音 / 首字母"));
+        search.setHint(SidebarText.component("panel.search.hint"));
         search.setResponder(value -> firstRow = 0);
     }
 
@@ -108,11 +109,11 @@ public final class SidebarPanel {
         var current = iconTargets().stream().filter(target -> target.entry().token().equals(captured.entry().token())
             && target.bounds().equals(captured.bounds())).findFirst().orElse(null);
         if (current == null) {
-            iconFeedback = "目标已变化，请重新拖放图标";
+            iconFeedback = () -> SidebarText.text("panel.feedback.target_changed");
             return false;
         }
         boolean saved = SidebarNotes.saveIcon(current.entry(), stack.copyWithCount(1));
-        iconFeedback = saved ? "本地图标已更新（仅自己可见）" : SidebarNotes.iconError();
+        iconFeedback = saved ? () -> SidebarText.text("panel.feedback.icon_saved") : SidebarNotes::iconError;
         return saved;
     }
 
@@ -174,6 +175,9 @@ public final class SidebarPanel {
         var box = controlBounds("search");
         if (box == null) return;
         search.setX(box.x()); search.setY(box.y()); search.setWidth(box.width());
+        // EditBox does not clip its placeholder; keep long translations inside the field.
+        search.setHint(Component.literal(Minecraft.getInstance().font.plainSubstrByWidth(
+            SidebarText.text("panel.search.hint"), Math.max(0, search.getInnerWidth()))));
     }
 
     void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
@@ -187,24 +191,24 @@ public final class SidebarPanel {
             theme.background(graphics, box.x(), box.y(), box.width(), box.height());
             if (box.width() < 40 || box.height() < 20) { unfocus(); return; }
             boolean providerView = SidebarClient.isProviderView();
-            clippedText(graphics, font, providerView ? "供应器标记" : "样板上传", box.x() + 7, box.y() + 7, box.width() - (box.collapsed() ? 29 : 65), theme.text());
+            clippedText(graphics, font, providerView ? SidebarText.text("panel.title.provider") : SidebarText.text("panel.title.upload"), box.x() + 7, box.y() + 7, box.width() - (box.collapsed() ? 29 : 65), theme.text());
             drawControl(graphics, theme, "collapse", box.collapsed() ? "+" : "−", mouseX, mouseY);
             if (box.collapsed()) {
                 unfocus();
                 if (box.contains(mouseX, mouseY)) graphics.renderTooltip(font,
-                    Component.literal(preferences.locked() ? "点击 + 展开；位置已锁定" : "点击 + 展开；拖动标题移动"), mouseX, mouseY);
+                    Component.literal(preferences.locked() ? SidebarText.text("panel.tooltip.expand_locked") : SidebarText.text("panel.tooltip.expand_movable")), mouseX, mouseY);
                 return;
             }
-            drawControl(graphics, theme, "lock", preferences.locked() ? "固" : "移", mouseX, mouseY);
-            drawControl(graphics, theme, "settings", settingsOpen ? "×" : "设", mouseX, mouseY);
+            drawControl(graphics, theme, "lock", preferences.locked() ? SidebarText.text("panel.button.locked") : SidebarText.text("panel.button.movable"), mouseX, mouseY);
+            drawControl(graphics, theme, "settings", settingsOpen ? "×" : SidebarText.text("panel.button.settings"), mouseX, mouseY);
             if (settingsOpen) { renderSettings(graphics, theme, box, mouseX, mouseY); return; }
             positionSearch();
-            if (providerView) clippedText(graphics, font, "已选中当前打开的供应器", box.x() + 7, box.y() + 29, box.width() - 14, theme.text());
+            if (providerView) clippedText(graphics, font, SidebarText.text("panel.provider.selected"), box.x() + 7, box.y() + 29, box.width() - 14, theme.text());
             else search.render(graphics, mouseX, mouseY, partialTick);
-            clippedText(graphics, font, providerView ? "管理备注、图标与映射" : SidebarMappings.hint(), box.x() + 7, box.y() + 49, box.width() - 49, theme.muted());
-            drawControl(graphics, theme, "mapping_selector", "映射", mouseX, mouseY);
-            clippedText(graphics, font, "供应器 · 右键备注", box.x() + 7, box.y() + 63, box.width() - 43, theme.muted());
-            graphics.drawString(font, "空槽", box.x() + box.width() - 8 - font.width("空槽"), box.y() + 63, theme.muted(), false);
+            clippedText(graphics, font, providerView ? SidebarText.text("panel.provider.manage") : SidebarMappings.hint(), box.x() + 7, box.y() + 49, box.width() - 49, theme.muted());
+            drawControl(graphics, theme, "mapping_selector", SidebarText.text("panel.button.mapping"), mouseX, mouseY);
+            clippedText(graphics, font, SidebarText.text("panel.list.heading"), box.x() + 7, box.y() + 63, box.width() - 43, theme.muted());
+            graphics.drawString(font, SidebarText.text("panel.list.free_slots"), box.x() + box.width() - 8 - font.width(SidebarText.text("panel.list.free_slots")), box.y() + 63, theme.muted(), false);
             var filtered = visibleRows();
             int shown = PanelGeometry.rowCount(box);
             firstRow = Math.max(0, Math.min(firstRow, Math.max(0, filtered.size() - shown)));
@@ -228,19 +232,19 @@ public final class SidebarPanel {
                     clippedText(graphics, font, label, bounds.x() + 24, bounds.y() + 4, bounds.width() - 64, theme.buttonText(true), theme.buttonShadow());
                     long free = item.members().stream().mapToLong(SidebarPackets.Entry::freeSlots).sum();
                     long total = item.members().stream().mapToLong(SidebarPackets.Entry::totalSlots).sum();
-                    clippedText(graphics, font, "×" + item.members().size() + "  " + free + "/" + total,
+                    clippedText(graphics, font, SidebarText.text("panel.group.slots", item.members().size(), free, total),
                         bounds.x() + 24, bounds.y() + 14, bounds.width() - 64, theme.buttonText(true));
                     var uploadBounds = groupUploadBounds(bounds);
                     boolean canUploadGroup = uploadEnabled && screen.getMenu().getCarried().isEmpty()
                         && item.members().stream().anyMatch(e -> e.freeSlots() > 0);
                     theme.button(graphics, uploadBounds.x(), uploadBounds.y(), uploadBounds.width(), uploadBounds.height(),
                         canUploadGroup, uploadBounds.contains(mouseX, mouseY));
-                    graphics.drawString(font, "上传", uploadBounds.x() + 4, uploadBounds.y() + 5,
+                    graphics.drawString(font, SidebarText.text("panel.button.upload"), uploadBounds.x() + 4, uploadBounds.y() + 5,
                         theme.buttonText(canUploadGroup), theme.buttonShadow());
                     if (hover) hoveredGroup = uploadBounds.contains(mouseX, mouseY)
-                        ? "向组内第一个有空槽的供应器上传 1 张样板"
-                        : SidebarNotes.displayName(entry) + " × " + item.members().size()
-                            + (expanded ? " · 点击折叠" : " · 点击展开后选择供应器");
+                        ? SidebarText.text("panel.group.upload")
+                        : SidebarText.text(expanded ? "panel.group.collapse" : "panel.group.expand",
+                            SidebarNotes.displayName(entry), item.members().size());
                     continue;
                 }
                 boolean enabled = uploadEnabled && entry.freeSlots() > 0 || SidebarNotes.canEdit(entry) || SidebarNotes.canEditIcon(entry);
@@ -259,7 +263,7 @@ public final class SidebarPanel {
                 if (hover) { hovered = entry; hoveredIcon = hit("icon" + row, mouseX, mouseY);
                     hoveredFavorite = hit("favorite" + row, mouseX, mouseY); }
             }
-            if (filtered.isEmpty()) clippedText(graphics, font, SidebarClient.entries().isEmpty() ? "暂无供应器" : "没有匹配项",
+            if (filtered.isEmpty()) clippedText(graphics, font, SidebarClient.entries().isEmpty() ? SidebarText.text("panel.list.empty") : SidebarText.text("panel.list.no_matches"),
                 box.x() + 8, box.y() + PanelGeometry.LIST_TOP + 9, box.width() - 16, theme.muted());
             if (filtered.size() > shown) {
                 int trackHeight = shown * PanelGeometry.ROW_HEIGHT - 2;
@@ -270,57 +274,62 @@ public final class SidebarPanel {
                 graphics.fill(trackX, thumbY, trackX + 1, thumbY + thumbHeight, theme.text());
             }
             int footerY = box.y() + box.height() - 30;
-            clippedText(graphics, font, providerView ? "当前目标 · 仅自己可见" : "已编码样板 ×" + SidebarClient.encodedCount(), box.x() + 7, footerY, box.width() - 14, theme.text());
-            String status = !iconFeedback.isEmpty() ? iconFeedback
-                : !noteError.isEmpty() ? noteError : persistenceError.isEmpty() ? SidebarClient.status() : persistenceError;
+            clippedText(graphics, font, providerView ? SidebarText.text("panel.footer.private_target") : SidebarText.text("panel.footer.encoded", SidebarClient.encodedCount()), box.x() + 7, footerY, box.width() - 14, theme.text());
+            String currentIconFeedback = SidebarText.resolve(iconFeedback.get());
+            String currentNoteError = SidebarText.resolve(noteError.get());
+            String status = !currentIconFeedback.isEmpty() ? currentIconFeedback
+                : !currentNoteError.isEmpty() ? currentNoteError
+                : SidebarText.resolve(persistenceError.isEmpty() ? SidebarClient.status() : persistenceError);
             clippedText(graphics, font, status, box.x() + 7, footerY + 14, box.width() - 14, theme.muted());
             if (hoveredGroup != null) graphics.renderTooltip(font, Component.literal(hoveredGroup), mouseX, mouseY);
             else if (hovered != null) {
                 String note = SidebarNotes.note(hovered);
                 if (hoveredFavorite) graphics.renderTooltip(font,
-                    Component.literal(SidebarNotes.favorite(hovered) ? "点击取消收藏置顶 · 仅自己可见" : "点击收藏置顶 · 仅自己可见"), mouseX, mouseY);
+                    Component.literal(SidebarNotes.favorite(hovered) ? SidebarText.text("panel.tooltip.unfavorite") : SidebarText.text("panel.tooltip.favorite")), mouseX, mouseY);
                 else if (hoveredIcon) graphics.renderComponentTooltip(font, List.of(
-                    Component.literal("原名：" + hovered.name()),
-                    Component.literal("显示图标：" + SidebarNotes.icon(hovered).getHoverName().getString()),
-                    Component.literal("JEI 拖物品至此：设置私人图标"),
-                    Component.literal("拿起背包物品后左键：只复制，不消耗"),
-                    Component.literal("Shift + 右键：恢复默认图标"),
-                    Component.literal("中键：定位 / 取消此供应器，穿墙高亮 60 秒"),
-                    Component.literal(SidebarNotes.canEditIcon(hovered) ? (providerView ? "仅自己可见；空手点击编辑备注" : "仅自己可见；空手点击仍上传 / 备注") : SidebarNotes.iconError())), mouseX, mouseY);
-                else graphics.renderComponentTooltip(font, List.of(Component.literal("原名：" + hovered.name()),
-                    Component.literal("私人备注：" + (note.isEmpty() ? "未设置" : note)),
-                    Component.literal("位置：" + SidebarNotes.locationLabel(hovered)),
-                    Component.literal("中键：定位 / 取消此供应器，关闭终端后查看"),
-                    Component.literal("空槽：" + hovered.freeSlots() + " / " + hovered.totalSlots()),
-                    Component.literal(SidebarMappings.matches(hovered) ? "匹配当前配方类别 / 机器映射" : "可手动选择此供应器"),
-                    Component.literal(uploadEnabled && hovered.freeSlots() > 0 ? "左键上传 1 张已编码样板" : SidebarClient.status()),
-                    Component.literal(SidebarNotes.canEdit(hovered) ? "右键编辑备注（仅自己可见）" : SidebarNotes.unavailableReason())), mouseX, mouseY);
+                    SidebarText.component("panel.tooltip.original_name", hovered.name()),
+                    SidebarText.component("panel.tooltip.icon", SidebarNotes.icon(hovered).getHoverName()),
+                    SidebarText.component("panel.tooltip.icon_jei"),
+                    SidebarText.component("panel.tooltip.icon_inventory"),
+                    SidebarText.component("panel.tooltip.icon_reset"),
+                    SidebarText.component("panel.tooltip.locate_icon"),
+                    Component.literal(SidebarNotes.canEditIcon(hovered) ? (providerView ? SidebarText.text("panel.tooltip.icon_provider") : SidebarText.text("panel.tooltip.icon_terminal")) : SidebarNotes.iconError())), mouseX, mouseY);
+                else graphics.renderComponentTooltip(font, List.of(SidebarText.component("panel.tooltip.original_name", hovered.name()),
+                    SidebarText.component("panel.tooltip.note",
+                        note.isEmpty() ? SidebarText.component("panel.tooltip.note_unset") : Component.literal(note)),
+                    SidebarText.component("panel.tooltip.location", SidebarNotes.locationLabel(hovered)),
+                    SidebarText.component("panel.tooltip.locate"),
+                    SidebarText.component("panel.tooltip.free_slots", hovered.freeSlots(), hovered.totalSlots()),
+                    Component.literal(SidebarMappings.matches(hovered) ? SidebarText.text("panel.tooltip.matches") : SidebarText.text("panel.tooltip.manual")),
+                    Component.literal(uploadEnabled && hovered.freeSlots() > 0 ? SidebarText.text("panel.tooltip.upload") : SidebarText.resolve(SidebarClient.status())),
+                    Component.literal(SidebarNotes.canEdit(hovered) ? SidebarText.text("panel.tooltip.edit_note") : SidebarNotes.unavailableReason())), mouseX, mouseY);
             } else if (mouseY >= footerY && box.contains(mouseX, mouseY)) {
                 graphics.renderTooltip(font, Component.literal(status), mouseX, mouseY);
             } else if (mouseY >= box.y() + 44 && mouseY < box.y() + 62 && box.contains(mouseX, mouseY)) {
-                graphics.renderTooltip(font, Component.literal(providerView ? "管理映射及逐条自动上传开关" : SidebarMappings.hint()), mouseX, mouseY);
+                graphics.renderTooltip(font, Component.literal(providerView ? SidebarText.text("panel.tooltip.mappings") : SidebarMappings.hint()), mouseX, mouseY);
             } else renderHeaderTooltip(graphics, mouseX, mouseY);
         } finally { graphics.pose().popPose(); }
     }
 
     private void renderSettings(GuiGraphics graphics, SidebarTheme theme, SidebarSession.Layout box, int mouseX, int mouseY) {
         Font font = Minecraft.getInstance().font;
-        drawControl(graphics, theme, "theme", "主题：" + (preferences.theme() == SidebarPreferences.Theme.AE2 ? "AE2" : "原版 / 资源包"), mouseX, mouseY);
-        String mode = switch (preferences.heightMode()) { case COMPACT -> "紧凑"; case STANDARD -> "标准"; case TERMINAL -> "跟随终端"; };
-        drawControl(graphics, theme, "height", "高度：" + mode, mouseX, mouseY);
-        clippedText(graphics, font, "宽度 " + preferences.width(), box.x() + 8, controlBounds("width_minus").y() + 4, box.width() - 62, theme.text());
-        clippedText(graphics, font, "行数 " + preferences.rows(), box.x() + 8, controlBounds("rows_minus").y() + 4, box.width() - 62, theme.text());
+        drawControl(graphics, theme, "theme", SidebarText.text("panel.settings.theme", preferences.theme() == SidebarPreferences.Theme.AE2 ? "AE2" : SidebarText.text("panel.settings.theme.vanilla")), mouseX, mouseY);
+        String mode = switch (preferences.heightMode()) { case COMPACT -> SidebarText.text("panel.settings.height.compact"); case STANDARD -> SidebarText.text("panel.settings.height.standard"); case TERMINAL -> SidebarText.text("panel.settings.height.terminal"); };
+        drawControl(graphics, theme, "height", SidebarText.text("panel.settings.height", mode), mouseX, mouseY);
+        clippedText(graphics, font, SidebarText.text("panel.settings.width", preferences.width()), box.x() + 8, controlBounds("width_minus").y() + 4, box.width() - 62, theme.text());
+        clippedText(graphics, font, SidebarText.text("panel.settings.rows", preferences.rows()), box.x() + 8, controlBounds("rows_minus").y() + 4, box.width() - 62, theme.text());
         for (String id : List.of("width_minus", "rows_minus")) drawControl(graphics, theme, id, "−", mouseX, mouseY);
         for (String id : List.of("width_plus", "rows_plus")) drawControl(graphics, theme, id, "+", mouseX, mouseY);
-        drawControl(graphics, theme, "reset", "重置位置 / 解锁", mouseX, mouseY);
-        drawControl(graphics, theme, "mappings", "管理机器映射", mouseX, mouseY);
-        drawControl(graphics, theme, "grouping", "同类合并：" + (preferences.groupProviders() ? "开" : "关"), mouseX, mouseY);
-        if (box.height() >= 206) clippedText(graphics, font, persistenceError.isEmpty() ? "修改自动保存" : persistenceError,
+        drawControl(graphics, theme, "reset", SidebarText.text("panel.settings.reset"), mouseX, mouseY);
+        drawControl(graphics, theme, "mappings", SidebarText.text("panel.settings.mappings"), mouseX, mouseY);
+        drawControl(graphics, theme, "grouping", SidebarText.text("panel.settings.grouping",
+            SidebarText.text(preferences.groupProviders() ? "panel.settings.on" : "panel.settings.off")), mouseX, mouseY);
+        if (box.height() >= 206) clippedText(graphics, font, persistenceError.isEmpty() ? SidebarText.text("panel.settings.auto_saved") : SidebarText.resolve(persistenceError),
             box.x() + 8, box.y() + 188, box.width() - 16, theme.muted());
-        if (hit("theme", mouseX, mouseY)) graphics.renderTooltip(font, Component.literal("AE2 使用 AE2 纹理；原版主题跟随原版界面资源包（含 Cozy）"), mouseX, mouseY);
-        else if (hit("grouping", mouseX, mouseY)) graphics.renderTooltip(font, Component.literal("同原名、同备注的供应器合并；收藏单独分组。点击展开后选择具体目标"), mouseX, mouseY);
-        else if (hit("height", mouseX, mouseY)) graphics.renderTooltip(font, Component.literal("紧凑固定 3 行；标准使用自定行数；跟随终端使用终端高度"), mouseX, mouseY);
-        else if (hit("rows_minus", mouseX, mouseY) || hit("rows_plus", mouseX, mouseY)) graphics.renderTooltip(font, Component.literal("修改行数会切换到标准高度；屏幕不足时自动减少可见行"), mouseX, mouseY);
+        if (hit("theme", mouseX, mouseY)) graphics.renderTooltip(font, SidebarText.component("panel.settings.theme.tooltip"), mouseX, mouseY);
+        else if (hit("grouping", mouseX, mouseY)) graphics.renderTooltip(font, SidebarText.component("panel.settings.grouping.tooltip"), mouseX, mouseY);
+        else if (hit("height", mouseX, mouseY)) graphics.renderTooltip(font, SidebarText.component("panel.settings.height.tooltip"), mouseX, mouseY);
+        else if (hit("rows_minus", mouseX, mouseY) || hit("rows_plus", mouseX, mouseY)) graphics.renderTooltip(font, SidebarText.component("panel.settings.rows.tooltip"), mouseX, mouseY);
         else renderHeaderTooltip(graphics, mouseX, mouseY);
     }
 
@@ -334,8 +343,8 @@ public final class SidebarPanel {
     }
 
     private void renderHeaderTooltip(GuiGraphics graphics, int x, int y) {
-        String tip = hit("lock", x, y) ? (preferences.locked() ? "位置已锁定；点击解锁" : "允许拖动标题；点击锁定位置")
-            : hit("settings", x, y) ? "打开 / 关闭面板设置" : hit("collapse", x, y) ? "折叠成小标签" : null;
+        String tip = hit("lock", x, y) ? (preferences.locked() ? SidebarText.text("panel.tooltip.unlock") : SidebarText.text("panel.tooltip.lock"))
+            : hit("settings", x, y) ? SidebarText.text("panel.tooltip.settings") : hit("collapse", x, y) ? SidebarText.text("panel.tooltip.collapse") : null;
         if (tip != null) graphics.renderTooltip(Minecraft.getInstance().font, Component.literal(tip), x, y);
     }
 
@@ -393,24 +402,26 @@ public final class SidebarPanel {
                     return;
                 }
                 var entry = item.members().getFirst();
-                noteError = "";
-                iconFeedback = "";
+                noteError = () -> "";
+                iconFeedback = () -> "";
                 if (hit("favorite" + row, mouseX, mouseY)) {
                     if (button == 0) {
                         boolean saved = SidebarNotes.toggleFavorite(entry);
-                        iconFeedback = saved ? (SidebarNotes.favorite(entry) ? "已收藏置顶" : "已取消收藏") : SidebarNotes.favoriteError();
+                        boolean favorite = SidebarNotes.favorite(entry);
+                        iconFeedback = saved ? () -> SidebarText.text(favorite ? "panel.feedback.favorite_added" : "panel.feedback.favorite_removed") : SidebarNotes::favoriteError;
                         if (saved) firstRow = 0;
                     }
                     return;
                 }
                 if (button == 2) {
-                    iconFeedback = SidebarLocator.toggle(entry);
+                    Component message = SidebarLocator.toggleMessage(entry);
+                    iconFeedback = message::getString;
                     return;
                 }
                 if (hit("icon" + row, mouseX, mouseY)) {
                     if (button == 1 && Screen.hasShiftDown()) {
                         boolean saved = SidebarNotes.resetIcon(entry);
-                        iconFeedback = saved ? "已恢复默认图标" : SidebarNotes.iconError();
+                        iconFeedback = saved ? () -> SidebarText.text("panel.feedback.icon_reset") : SidebarNotes::iconError;
                         return;
                     }
                     var carried = screen.getMenu().getCarried();
@@ -420,7 +431,7 @@ public final class SidebarPanel {
                     }
                 }
                 if (button == 1 || SidebarClient.isProviderView()) {
-                    if (!NoteEditorScreen.open(screen, entry)) noteError = SidebarNotes.unavailableReason();
+                    if (!NoteEditorScreen.open(screen, entry)) noteError = SidebarNotes::unavailableReason;
                 } else SidebarClient.upload(entry);
                 return;
             }
@@ -479,7 +490,7 @@ public final class SidebarPanel {
     private void save() {
         try { preferences.save(preferencesPath); persistenceError = ""; }
         catch (IOException error) {
-            persistenceError = "偏好保存失败，本次会话仍可使用";
+            persistenceError = SidebarText.PREFIX + "panel.error.save_preferences";
             LogUtils.getLogger().warn("Cannot save AE2 sidebar client preferences", error);
         }
     }

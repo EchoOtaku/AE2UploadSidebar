@@ -27,7 +27,7 @@ final class EaepMappings {
     }
 
     private static IllegalStateException failed(Throwable failure) {
-        error = "EAEP 映射接口不可用，请检查版本；未切换或写入独立映射";
+        error = SidebarText.PREFIX + "error.eaep_mapping_unavailable";
         return new IllegalStateException(error, failure);
     }
     static String error() { return error; }

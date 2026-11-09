@@ -82,6 +82,7 @@ public final class EmbeddedSmoke {
     private volatile boolean clientInteractionPassed;
     private volatile boolean minimalServerInventoryVerified;
     private boolean layoutInteractionPassed;
+    private boolean languageAssertionsPassed;
     private boolean mappingAssertionsPassed;
     private boolean runtimeToggleAssertionsPassed;
     private boolean privateNotesAssertionsPassed;
@@ -139,7 +140,7 @@ public final class EmbeddedSmoke {
             failAndStop(client, failure);
         }
         try {
-            if (System.nanoTime() - startedAt > TimeUnit.SECONDS.toNanos(CozyUiAssertions.ENABLED ? 180 : 120)) {
+            if (System.nanoTime() - startedAt > TimeUnit.SECONDS.toNanos(300)) {
                 throw new AssertionError("Bounded smoke timeout at stage: " + stage);
             }
             Path runDirectory = client.gameDirectory.toPath().toAbsolutePath().normalize();
@@ -168,6 +169,11 @@ public final class EmbeddedSmoke {
                         new WorldOptions(20260906L, false, false),
                         WorldPresets::createNormalWorldDimensions, client.screen);
                 }
+            }
+            if (assertionsPassed && !languageAssertionsPassed) {
+                stage = "checking actual en_us, zh_tw and zh_cn resource reloads and UI previews";
+                languageAssertionsPassed = LanguageAssertions.tick(client);
+                if (!languageAssertionsPassed) return;
             }
             if (mappingAssertionsPassed && !privateNotesAssertionsPassed && client.getOverlay() == null) {
                 stage = "checking private provider notes through real sidebar gestures";
@@ -232,7 +238,7 @@ public final class EmbeddedSmoke {
                         + "exact_mod_allowlist=PASS\npacket_codec=PASS\nserver_transaction_invariants=PASS\n"
                         + "embedded_real_network_upload_3_to_2=PASS\n"
                         + "minimal_server_source_two_provider_total_one=PASS\n"
-                        + RuntimeToggleAssertions.report() + MappingAssertions.report() + PrivateNotesAssertions.report()
+                        + LanguageAssertions.report() + RuntimeToggleAssertions.report() + MappingAssertions.report() + PrivateNotesAssertions.report()
                         + LayoutInteractionAssertions.report() + SmokeScreenshots.report()
                         + "optional_jei_wireless_extended_tests=NOT_APPLICABLE\n");
                     client.stop();
@@ -294,7 +300,7 @@ public final class EmbeddedSmoke {
                     + "embedded_real_network_upload_3_to_2=PASS\n"
                     + "wireless_wet_real_screen_input_and_upload_3_to_2=PASS\n"
                     + "wireless_provider_inventory_delta_one=PASS\n"
-                    + RuntimeToggleAssertions.report() + MappingAssertions.report() + PrivateNotesAssertions.report() + PrivateIconsAssertions.report()
+                    + LanguageAssertions.report() + RuntimeToggleAssertions.report() + MappingAssertions.report() + PrivateNotesAssertions.report() + PrivateIconsAssertions.report()
                     + LayoutInteractionAssertions.report() + LocatorAssertions.report() + normalCategory.report() + wirelessCategory.report() + providerEditor.report() + CozyUiAssertions.report() + SmokeScreenshots.report());
                 LogUtils.getLogger().info("EMBEDDED_SMOKE: SMOKE_PASS; stopping isolated client");
                 client.stop();

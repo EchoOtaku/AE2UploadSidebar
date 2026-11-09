@@ -42,7 +42,8 @@ public final class ProviderNotesStore {
             notes = loaded;
         } catch (IOException | IllegalArgumentException | SecurityException failure) {
             available = false;
-            error = "备注文件读取失败，已停止写入以保留原文件：" + failure.getClass().getSimpleName();
+            error = "ae2_upload_sidebar.error.notes.read";
+            System.getLogger(ProviderNotesStore.class.getName()).log(System.Logger.Level.WARNING, "Cannot read private notes", failure);
         }
     }
 
@@ -57,7 +58,7 @@ public final class ProviderNotesStore {
         if (!available) return false;
         String value = text == null ? "" : text.strip();
         if (!validKey(scope, identity) || !validText(value)) {
-            error = "备注最多 64 个字符，且不能含换行、控制符或格式代码";
+            error = "ae2_upload_sidebar.error.notes.invalid";
             return false;
         }
         Properties next = new Properties();
@@ -86,7 +87,8 @@ public final class ProviderNotesStore {
             error = null;
             return true;
         } catch (IOException | SecurityException failure) {
-            error = "备注未保存，原内容已保留：" + failure.getMessage();
+            error = "ae2_upload_sidebar.error.notes.save";
+            System.getLogger(ProviderNotesStore.class.getName()).log(System.Logger.Level.WARNING, "Cannot save private notes", failure);
             return false;
         } finally {
             if (temporary != null) {

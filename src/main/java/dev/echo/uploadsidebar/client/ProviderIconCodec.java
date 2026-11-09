@@ -23,22 +23,22 @@ public final class ProviderIconCodec {
 
     /** Empty explicitly restores the default. Invalid nonempty selections throw, never silently clear. */
     public static String encode(ItemStack source, HolderLookup.Provider registries) {
-        if (source == null) throw new IllegalArgumentException("请选择有效的物品图标");
+        if (source == null) throw new IllegalArgumentException("Select a valid item icon");
         if (source.isEmpty()) return "";
-        if (registries == null) throw new IllegalArgumentException("当前世界注册表不可用，请重新打开终端");
+        if (registries == null) throw new IllegalArgumentException("World registry is unavailable");
         try {
             var encoded = ItemStack.CODEC.encodeStart(registries.createSerializationContext(JsonOps.INSTANCE),
                     source.copyWithCount(1))
-                .getOrThrow(ignored -> new IllegalArgumentException("此物品的图标组件无法保存"));
+                .getOrThrow(ignored -> new IllegalArgumentException("Item icon components cannot be saved"));
             String json = encoded.toString();
-            if (!boundedJson(json)) throw new IllegalArgumentException("图标数据过大或过于复杂，最多 16 KiB、64 层");
+            if (!boundedJson(json)) throw new IllegalArgumentException("Icon data exceeds 16 KiB or 64 levels");
             // Do not commit data which is already invalid in the current registry, including partial codec errors.
-            if (decode(json, registries).isEmpty()) throw new IllegalArgumentException("此物品的图标组件无法恢复");
+            if (decode(json, registries).isEmpty()) throw new IllegalArgumentException("Item icon components cannot be restored");
             return json;
         } catch (IllegalArgumentException failure) {
             throw failure;
         } catch (RuntimeException failure) {
-            throw new IllegalArgumentException("此物品的图标数据无法保存", failure);
+            throw new IllegalArgumentException("Item icon data cannot be saved", failure);
         }
     }
 

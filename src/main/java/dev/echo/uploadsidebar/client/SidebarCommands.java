@@ -18,27 +18,26 @@ public final class SidebarCommands {
             .then(Commands.literal("on").executes(context -> change(context.getSource(), true)))
             .then(Commands.literal("unhighlight").executes(context -> {
                 SidebarLocator.clear();
-                context.getSource().sendSuccess(() -> Component.literal("[AE2 上传侧栏] 已取消供应器定位。"), false);
+                context.getSource().sendSuccess(() -> SidebarText.component("commands.unhighlight"), false);
                 return 1;
             })));
     }
 
     private static int status(CommandSourceStack source) {
-        String state = SidebarClient.isEnabled() ? "开启" : "关闭";
-        source.sendSuccess(() -> Component.literal("[AE2 上传侧栏] 当前：" + state
-            + "。/ae2sidebar off 关闭，/ae2sidebar on 恢复（只影响自己）。"), false);
+        Component state = SidebarText.component(SidebarClient.isEnabled() ? "commands.on" : "commands.off");
+        source.sendSuccess(() -> SidebarText.component("commands.status", state), false);
         if (SidebarClient.switchPersistenceError() != null)
-            source.sendFailure(Component.literal("开关配置读取或保存失败；请以当前状态为准。on/off 可重新尝试保存。"));
+            source.sendFailure(SidebarText.component("commands.config_error"));
         return 1;
     }
 
     private static int change(CommandSourceStack source, boolean enabled) {
         boolean saved = SidebarClient.setEnabled(enabled);
-        String feedback = enabled ? "已开启，打开编码终端或样板供应器即可使用。" : "已关闭侧栏及其交互；原 AE2 界面可照常使用。";
-        source.sendSuccess(() -> Component.literal("[AE2 上传侧栏] " + feedback
-            + (saved ? " 状态已保存。" : " 本次已生效，但未保存。")), false);
+        Component feedback = SidebarText.component(enabled ? "commands.enabled" : "commands.disabled");
+        source.sendSuccess(() -> SidebarText.component("commands.changed", feedback,
+            SidebarText.component(saved ? "commands.saved" : "commands.unsaved")), false);
         if (!saved) {
-            source.sendFailure(Component.literal("无法写入开关配置，下次启动可能恢复为此前状态。详情见日志。"));
+            source.sendFailure(SidebarText.component("commands.save_error"));
             LogUtils.getLogger().warn("AE2 sidebar runtime switch changed but could not be saved: {}",
                 SidebarClient.switchPersistenceError());
         }

@@ -35,23 +35,27 @@ public final class SidebarLocator {
     }
 
     public static String toggle(SidebarPackets.Entry entry) {
+        return toggleMessage(entry).getString();
+    }
+
+    public static Component toggleMessage(SidebarPackets.Entry entry) {
         Minecraft client = Minecraft.getInstance();
         var parsed = SidebarNotes.providerLocation(entry);
         if (parsed.isEmpty() || client.level == null || client.player == null) {
-            return "此目标暂无可靠位置，请等待刷新；房主需使用 0.4 或更新补丁";
+            return SidebarText.component("locator.unavailable");
         }
         ProviderLocation location = parsed.get();
         if (!client.level.dimension().location().toString().equals(location.dimension())) {
             clear();
-            String message = "目标在 " + location.dimension() + "（" + coordinates(location) + "），当前维度无法高亮";
-            client.player.displayClientMessage(Component.literal("[供应器定位] " + message), false);
+            Component message = SidebarText.component("locator.other_dimension", location.dimension(), coordinatesComponent(location));
+            client.player.displayClientMessage(SidebarText.component("locator.chat", message), false);
             return message;
         }
         if (location.y() < client.level.getMinBuildHeight() || location.y() >= client.level.getMaxBuildHeight()) {
-            return "目标高度超出当前维度范围，无法高亮";
+            return SidebarText.component("locator.invalid_height");
         }
         boolean selected = session.toggle(location, SidebarNotes.displayName(entry), client.getConnection(), client.level, Util.getMillis());
-        return selected ? "已定位：关闭终端查看高亮（60 秒）；再次中键取消" : "已取消供应器定位";
+        return SidebarText.component(selected ? "locator.selected" : "locator.canceled");
     }
 
     public static void clear() { session.clear(); }
@@ -94,9 +98,9 @@ public final class SidebarLocator {
         long seconds = Math.max(1, (target.expiresAt() - Util.getMillis() + 999) / 1000);
         var graphics = event.getGuiGraphics();
         int available = Math.max(0, graphics.guiWidth() - 16);
-        String title = client.font.plainSubstrByWidth("供应器：" + target.name(), available);
-        String details = client.font.plainSubstrByWidth(coordinates(location) + " · " + distance + "m · " + seconds + "秒", available);
-        String hint = client.level.hasChunkAt(pos) ? "中键同一条目或 /ae2sidebar unhighlight 取消" : "目标区块尚未加载；标记为上次查询位置";
+        String title = client.font.plainSubstrByWidth(SidebarText.text("locator.provider", target.name()), available);
+        String details = client.font.plainSubstrByWidth(SidebarText.text("locator.details", coordinates(location), distance, seconds), available);
+        String hint = client.level.hasChunkAt(pos) ? SidebarText.text("locator.cancel_hint") : SidebarText.text("locator.unloaded");
         graphics.drawString(client.font, title, 8, 8, 0xffffc733);
         graphics.drawString(client.font, details, 8, 20, 0xffffffff);
         graphics.drawString(client.font, client.font.plainSubstrByWidth(hint, available), 8, 32, 0xffbcbcbc);
@@ -116,11 +120,14 @@ public final class SidebarLocator {
     }
 
     private static String coordinates(ProviderLocation location) {
-        String face = switch (location.side()) {
-            case "down" -> "下侧"; case "up" -> "上侧"; case "north" -> "北侧";
-            case "south" -> "南侧"; case "west" -> "西侧"; case "east" -> "东侧"; default -> "";
-        };
-        return location.x() + ", " + location.y() + ", " + location.z() + (face.isEmpty() ? "" : " [" + face + "]");
+        return coordinatesComponent(location).getString();
+    }
+
+    private static Component coordinatesComponent(ProviderLocation location) {
+        var result = Component.literal(location.x() + ", " + location.y() + ", " + location.z());
+        if (java.util.Set.of("down", "up", "north", "south", "west", "east").contains(location.side()))
+            result.append(" [").append(SidebarText.component("locator.face." + location.side())).append("]");
+        return result;
     }
 
     /** Separate from ExtendedAE's shared highlight queue, so canceling cannot remove another tool's markers. */

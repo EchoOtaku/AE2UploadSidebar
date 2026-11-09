@@ -181,7 +181,8 @@ public final class SidebarPanel {
         var theme = new SidebarTheme(preferences.theme());
         Font font = Minecraft.getInstance().font;
         graphics.pose().pushPose();
-        graphics.pose().translate(0, 0, 300);
+        // Item rendering adds another 150: keep every panel element below tooltips at 400.
+        graphics.pose().translate(0, 0, 200);
         try {
             theme.background(graphics, box.x(), box.y(), box.width(), box.height());
             if (box.width() < 40 || box.height() < 20) { unfocus(); return; }
@@ -224,13 +225,22 @@ public final class SidebarPanel {
                     boolean expanded = expandedGroups.contains(item.key());
                     String label = (expanded ? "− " : "+ ") + SidebarNotes.displayName(entry);
                     graphics.renderItem(SidebarNotes.icon(entry), bounds.x() + 4, bounds.y() + 5);
-                    clippedText(graphics, font, label, bounds.x() + 24, bounds.y() + 4, bounds.width() - 28, theme.buttonText(true), theme.buttonShadow());
+                    clippedText(graphics, font, label, bounds.x() + 24, bounds.y() + 4, bounds.width() - 64, theme.buttonText(true), theme.buttonShadow());
                     long free = item.members().stream().mapToLong(SidebarPackets.Entry::freeSlots).sum();
                     long total = item.members().stream().mapToLong(SidebarPackets.Entry::totalSlots).sum();
                     clippedText(graphics, font, "×" + item.members().size() + "  " + free + "/" + total,
-                        bounds.x() + 24, bounds.y() + 14, bounds.width() - 28, theme.buttonText(true));
-                    if (hover) hoveredGroup = SidebarNotes.displayName(entry) + " × " + item.members().size()
-                        + (expanded ? " · 点击折叠" : " · 点击展开后选择供应器");
+                        bounds.x() + 24, bounds.y() + 14, bounds.width() - 64, theme.buttonText(true));
+                    var uploadBounds = groupUploadBounds(bounds);
+                    boolean canUploadGroup = uploadEnabled && screen.getMenu().getCarried().isEmpty()
+                        && item.members().stream().anyMatch(e -> e.freeSlots() > 0);
+                    theme.button(graphics, uploadBounds.x(), uploadBounds.y(), uploadBounds.width(), uploadBounds.height(),
+                        canUploadGroup, uploadBounds.contains(mouseX, mouseY));
+                    graphics.drawString(font, "上传", uploadBounds.x() + 4, uploadBounds.y() + 5,
+                        theme.buttonText(canUploadGroup), theme.buttonShadow());
+                    if (hover) hoveredGroup = uploadBounds.contains(mouseX, mouseY)
+                        ? "向组内第一个有空槽的供应器上传 1 张样板"
+                        : SidebarNotes.displayName(entry) + " × " + item.members().size()
+                            + (expanded ? " · 点击折叠" : " · 点击展开后选择供应器");
                     continue;
                 }
                 boolean enabled = uploadEnabled && entry.freeSlots() > 0 || SidebarNotes.canEdit(entry) || SidebarNotes.canEditIcon(entry);
@@ -331,6 +341,10 @@ public final class SidebarPanel {
 
     boolean contains(double mouseX, double mouseY) { return layout().contains(mouseX, mouseY); }
 
+    private static SidebarSession.Layout groupUploadBounds(SidebarSession.Layout row) {
+        return rect(row.x() + row.width() - 36, row.y() + 3, 32, 20);
+    }
+
     void mouseClicked(double mouseX, double mouseY, int button) {
         var box = layout();
         if (!box.contains(mouseX, mouseY)) return;
@@ -370,6 +384,11 @@ public final class SidebarPanel {
             if (hit("row" + row, mouseX, mouseY) && firstRow + row < filtered.size()) {
                 var item = filtered.get(firstRow + row);
                 if (item.header()) {
+                    if (groupUploadBounds(controlBounds("row" + row)).contains(mouseX, mouseY)) {
+                        if (button == 0 && SidebarClient.canUpload() && screen.getMenu().getCarried().isEmpty())
+                            item.members().stream().filter(e -> e.freeSlots() > 0).findFirst().ifPresent(SidebarClient::upload);
+                        return;
+                    }
                     if (button == 0 && !expandedGroups.remove(item.key())) expandedGroups.add(item.key());
                     return;
                 }

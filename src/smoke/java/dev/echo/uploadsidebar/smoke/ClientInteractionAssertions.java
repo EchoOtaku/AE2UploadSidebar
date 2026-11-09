@@ -121,6 +121,17 @@ final class ClientInteractionAssertions {
         originalScreen = client.screen;
         originalMenu = client.player.containerMenu;
         clickedAt = System.nanoTime();
+        if (Boolean.getBoolean("sidebar.smoke.minimal")) {
+            var preferences = (dev.echo.uploadsidebar.client.SidebarPreferences) field(panel.getClass(), panel, "preferences");
+            preferences.setGroupProviders(true);
+            var rowsMethod = panel.getClass().getDeclaredMethod("visibleRows");
+            rowsMethod.setAccessible(true);
+            var rows = (List<?>) rowsMethod.invoke(panel);
+            require(((dev.echo.uploadsidebar.core.ProviderGroups.Row<?, ?>) rows.getFirst()).header(),
+                "minimal fixture must expose a merged provider header");
+            providerX = rowBounds.x() + rowBounds.width() - 20;
+            com.mojang.logging.LogUtils.getLogger().info("SMOKE_CLIENT_ASSERT: uploading through merged group button");
+        }
         require(press(screen, providerX, providerY).isCanceled(), "provider press consumed");
         var release = new ScreenEvent.MouseButtonReleased.Pre(screen, providerX, providerY, 0);
         NeoForge.EVENT_BUS.post(release);

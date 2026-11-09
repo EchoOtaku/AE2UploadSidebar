@@ -1,5 +1,7 @@
 # AE2 Upload Sidebar
 
+**This mod is 100% Vibe Coding.**
+
 Upload encoded patterns to a chosen pattern provider directly from an AE2 Pattern Encoding Terminal. Organize providers with private labels, item icons, favorites and Chinese pinyin search.
 
 ## Features
@@ -7,7 +9,7 @@ Upload encoded patterns to a chosen pattern provider directly from an AE2 Patter
 - Upload one encoded pattern to a selected provider and see its available pattern slots.
 - Search original names and private labels, including full Chinese pinyin and initials.
 - Pin favorite providers with the star button. Favorites still respect the search filter.
-- Enable grouping in sidebar settings to fold providers with the same original name and private label into one row. Click to expand and select an individual provider. Favorites form separate groups.
+- Enable grouping in sidebar settings to fold providers with the same original name and private label into one row. Click to expand and select an individual provider, or use the group upload button to send one pattern to the first member with free space. Favorites form separate groups.
 - Right-click a provider row to edit its private label. Use a held item or drag an item from JEI to change its display icon without consuming items.
 - Middle-click a row to highlight the actual provider in the world for 60 seconds.
 - Open a provider directly to manage its label, icon, favorite state and mappings.
@@ -18,7 +20,7 @@ Upload encoded patterns to a chosen pattern provider directly from an AE2 Patter
 
 ## Requirements
 
-Version 0.13.3-beta uses one JAR for Minecraft Java 1.21 and 1.21.1. Allowed ranges: NeoForge >=21.0.167 and <21.2; AE2 >=19.0.10-alpha and <20. Use the NeoForge and AE2 builds matching your Minecraft version and satisfy AE2's own dependencies. These ranges do not guarantee every intermediate or future version. Forge, Fabric, Minecraft 1.20.1 and 1.12.2 are not supported.
+Version 0.13.5-beta uses one JAR for Minecraft Java 1.21 and 1.21.1. Allowed ranges: NeoForge >=21.0.167 and <21.2; AE2 >=19.0.10-alpha and <20. Use the NeoForge and AE2 builds matching your Minecraft version and satisfy AE2's own dependencies. These ranges do not guarantee every intermediate or future version. Forge, Fabric, Minecraft 1.20.1 and 1.12.2 are not supported.
 
 Install the JAR in your instance's mods folder with the game closed. Remove the previous sidebar JAR when upgrading; keep only one version. Keep AE2's own dependencies installed.
 

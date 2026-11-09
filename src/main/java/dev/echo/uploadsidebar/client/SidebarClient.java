@@ -79,7 +79,8 @@ public final class SidebarClient {
             LogUtils.getLogger().warn("AE2 sidebar disabled because its runtime switch could not be read: {}",
                 runtimeSwitch.persistenceError());
         NeoForge.EVENT_BUS.addListener(SidebarClient::tick);
-        NeoForge.EVENT_BUS.addListener(SidebarClient::render);
+        // JEI draws overlays and tooltips at NORMAL priority in the same Post event.
+        NeoForge.EVENT_BUS.addListener(net.neoforged.bus.api.EventPriority.HIGH, SidebarClient::render);
         NeoForge.EVENT_BUS.addListener(SidebarClient::mousePressed);
         NeoForge.EVENT_BUS.addListener(SidebarClient::mouseReleased);
         NeoForge.EVENT_BUS.addListener(SidebarClient::mouseDragged);

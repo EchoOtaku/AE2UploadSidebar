@@ -181,6 +181,9 @@ final class LayoutInteractionAssertions {
                 verifyProtection(screen);
                 capture("sidebar-reset-position.png");
             }
+            case 9 -> {
+                if (!TooltipOverlapAssertions.tick(client, screen)) phase--;
+            }
             default -> { return true; }
         }
         return false;
